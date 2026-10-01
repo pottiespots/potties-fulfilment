@@ -95,6 +95,22 @@ Without email set up, the app still works. Reminders are recorded in the order h
 ### 6. Your real products
 Under **Pot stock** and **LL Manufacturing**, add your products. Use **the same SKUs as Shopify**: stock reserved for open orders is matched by SKU.
 
+## COGS sheet, Google Drive and Gmail sync
+
+Your daily Claude routine (“Potties COGS sheet daily refresh”) keeps the dashboard and the **Potties_COGS_Streamlined** sheet in step. Each system is in charge of different things:
+
+- **The COGS sheet is in charge of money**: supplier invoices, amounts and payments (tab 8. Invoices).
+- **The dashboard is in charge of fulfilment**: stages, deadlines, tracking, proof photos and packing slips.
+
+Each morning the routine:
+1. Sends every row of **8. Invoices** to the dashboard (`POST /api/integration/invoices`). Each invoice is created or updated by supplier + number, with a link to its PDF in Drive.
+2. Reads the dashboard (`GET /api/integration/export`) and writes a **15. Fulfilment** tab into the sheet, with each order's stage, ship-by date, courier and tracking number.
+3. Saves the dashboard’s packing slips, proof photos and proofs of payment into Drive (**Potties › Fulfilment › <order>**).
+4. Links waybills or artwork it finds in Gmail or Drive to the right order (`POST /api/integration/documents`).
+5. Logs how the run went (`POST /api/integration/report`). The result shows on **Today**, **Invoices** and **Logins → Check connections**.
+
+Every call needs the header `Authorization: Bearer <INTEGRATION_TOKEN>`. The Netlify site must be **public**, because the app’s own login protects the pages. A payment marked in the dashboard is kept until the sheet records it.
+
 ## Day to day
 
 - **Potties HQ** starts on **Today**. It lists everything that needs you (new orders to send, foundry questions, late orders, proof to approve, invoices due, low stock), each with a button to act.

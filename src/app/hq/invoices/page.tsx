@@ -6,6 +6,8 @@ import { day } from '@/lib/format';
 import { Pill, Tile } from '@/components/ui';
 import { ActButton, UploadSlot } from '@/components/client';
 import { markInvoicePaid, uploadPop } from '@/app/actions/hq';
+import { supplierName } from '@/lib/labels';
+import { SyncStatus } from '@/components/sync-status';
 
 export const metadata = { title: 'Invoices · Potties' };
 
@@ -16,7 +18,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const [invoices, orders, pos] = await Promise.all([invoicesWithPop(), listOrders('HQ'), purchaseOrdersFull()]);
   const sum = (list: typeof invoices) => list.reduce((t, i) => t + i.amountCents, 0);
   const unpaid = invoices.filter((i) => !i.paidAt);
-  const shown = invoices.filter((i) => s === 'all' || i.supplier === (s === 'll' ? 'LL' : 'FOUNDRY'))
+  const shown = invoices.filter((i) => s === 'all' || i.supplier === (s === 'll' ? 'LL' : s === 'other' ? 'OTHER' : 'FOUNDRY'))
     .sort((a, b) => Number(!!a.paidAt) - Number(!!b.paidAt) || a.dueAt.getTime() - b.dueAt.getTime());
   const noInvF = orders.filter((o) => stageIndex(o.stage) >= stageIndex('ACCEPTED') && !o.invoice);
   const noInvL = pos.filter((p) => p.status === 'DELIVERED' && !invoices.some((i) => i.purchaseOrderId === p.id));
@@ -24,16 +26,17 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const poName = new Map(pos.map((p) => [p.id, p]));
   return (
     <main className="page">
-      <div className="hello"><div><h2>Invoices & payments</h2><p>Every supplier invoice in one place. Attach the Xero invoice, mark it paid and upload the proof of payment.</p></div></div>
+      <div className="hello"><div><h2>Invoices & payments</h2><p>Every supplier invoice in one place. Your daily COGS run copies the sheet’s “8. Invoices” register in here; you can also attach invoices by hand.</p></div></div>
+      <SyncStatus />
       <div className="ftiles">
         <Tile tone="warn" v={money(sum(unpaid))} l="Total still to pay" s={`${unpaid.length} invoices`} />
         <Tile v={money(sum(unpaid.filter((i) => i.supplier === 'FOUNDRY')))} l="Owed to the foundry" />
-        <Tile v={money(sum(unpaid.filter((i) => i.supplier === 'LL')))} l="Owed to LL Manufacturing" />
+        <Tile v={money(sum(unpaid.filter((i) => i.supplier !== 'FOUNDRY')))} l="Owed to LL & other suppliers" />
         <Tile tone={unpaid.some((i) => i.dueAt < now) ? 'bad' : ''} v={money(sum(unpaid.filter((i) => i.dueAt < now)))} l="Overdue" s={`${invoices.filter((i) => i.paidAt && !i.pop).length} paid without POP`} />
       </div>
       <div className="toolbar">
         <div className="seg" role="group" aria-label="Supplier">
-          {[['all', 'All suppliers'], ['f', 'Foundry'], ['ll', 'LL Manufacturing']].map(([k, l]) => <Link key={k} href={k === 'all' ? '/hq/invoices' : `/hq/invoices?s=${k}`} aria-current={s === k ? 'page' : undefined}>{l}</Link>)}
+          {[['all', 'All suppliers'], ['f', 'Foundry'], ['ll', 'LL Manufacturing'], ...(invoices.some((i) => i.supplier === 'OTHER') ? [['other', 'Other suppliers']] : [])].map(([k, l]) => <Link key={k} href={k === 'all' ? '/hq/invoices' : `/hq/invoices?s=${k}`} aria-current={s === k ? 'page' : undefined}>{l}</Link>)}
         </div>
       </div>
       <div className="tbl-wrap">
@@ -44,8 +47,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
               const o = i.orderId ? orderName.get(i.orderId) : null, p = i.purchaseOrderId ? poName.get(i.purchaseOrderId) : null;
               return (
                 <tr key={i.id}>
-                  <td><span className={`sup ${i.supplier === 'LL' ? 'sup-ll' : ''}`}>{i.supplier === 'LL' ? 'LL' : 'Foundry'}</span></td>
-                  <td><span className="ft">XERO</span> <b>{i.number}</b>{i.invoiceFileId && <> · <a className="lnk" href={`/api/files/${i.invoiceFileId}`}>View</a></>}</td>
+                  <td><span className={`sup ${i.supplier !== 'FOUNDRY' ? 'sup-ll' : ''}`}>{supplierName(i.supplier, i.supplierLabel)}</span>{i.source === 'cogs-sheet' && <><br /><span className="sub2">from COGS sheet</span></>}</td>
+                  <td><span className="ft">XERO</span> <b>{i.number}</b>{i.invoiceFileId && <> · <a className="lnk" href={`/api/files/${i.invoiceFileId}`}>View</a></>}{i.driveUrl && <> · <a className="lnk" href={i.driveUrl} target="_blank" rel="noreferrer">Drive</a></>}</td>
                   <td>{o ? <Link className="lnk" href={`/hq/orders/${o.id}`}>{o.name}</Link> : p ? <Link className="lnk" href="/hq/ll">{p.number}</Link> : <span className="sub2">—</span>}{o && ` · ${o.customerName}`}</td>
                   <td className="r num"><b>{money(i.amountCents)}</b></td>
                   <td className="num">{day(i.dueAt)}</td>

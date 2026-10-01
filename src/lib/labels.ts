@@ -6,6 +6,10 @@ export const KIND_LABEL: Record<FileKind, string> = {
   INVOICE: 'Invoice', POP: 'Proof of payment',
 };
 
+/** Display name for a supplier, e.g. Foundry, LL, Huntlea. */
+export const supplierName = (supplier: string, label?: string | null) =>
+  supplier === 'FOUNDRY' ? 'Foundry' : supplier === 'LL' ? 'LL' : label || 'Other';
+
 export const PHOTO_SLOTS: FileKind[] = ['PHOTO_PRODUCT', 'PHOTO_CUSTOM', 'PHOTO_PACKED', 'PHOTO_WAYBILL'];
 export const COURIERS = ['The Courier Guy', 'Aramex', 'Pargo', 'PostNet', 'Fastway', 'DSV', 'Other'];
 export const NOTE_PRESETS = ['Mould ready', 'Poured today', 'Cooling / fettling', 'Seasoned', 'Waiting on materials', 'Problem / delay: ', 'Courier booked'];

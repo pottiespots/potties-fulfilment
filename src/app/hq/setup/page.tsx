@@ -1,6 +1,7 @@
-import { sql } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
 import { requireRole } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { syncRuns } from '@/lib/db/schema';
 import { gql, shopifyConfigured } from '@/lib/shopify';
 import { Pill } from '@/components/ui';
 
@@ -32,6 +33,12 @@ export default async function Setup() {
   checks.push(process.env.CRON_SECRET
     ? { name: 'Daily reminders', ok: true, detail: 'Runs at 07:00 Mon–Sat (also keeps the free Supabase project awake)' }
     : { name: 'Daily reminders', ok: false, detail: 'CRON_SECRET not set, so the morning job is switched off', fix: 'Add CRON_SECRET (any long random text) in your hosting settings.' });
+  const [lastRun] = await db.select().from(syncRuns).orderBy(desc(syncRuns.createdAt)).limit(1);
+  checks.push((process.env.INTEGRATION_TOKEN ?? '').length >= 32
+    ? (lastRun
+        ? { name: 'COGS sheet sync', ok: lastRun.ok && Date.now() - lastRun.createdAt.getTime() < 36 * 36e5, detail: `Last run ${lastRun.createdAt.toISOString().slice(0, 16).replace('T', ' ')} UTC: ${lastRun.summary.slice(0, 200)}`, fix: 'Check the “Potties COGS sheet daily refresh” routine in Claude.' }
+        : { name: 'COGS sheet sync', ok: null, detail: 'Connection key is set. Waiting for the first daily run.' })
+    : { name: 'COGS sheet sync', ok: false, detail: 'INTEGRATION_TOKEN not set', fix: 'Add INTEGRATION_TOKEN (40+ random characters) in your hosting settings and in the daily routine.' });
   checks.push({ name: 'Proof approval before tracking', ok: null, detail: process.env.REQUIRE_HQ_PROOF_APPROVAL === 'true' ? 'Required' : 'Not required (HQ approval is a reminder only)' });
 
   return (

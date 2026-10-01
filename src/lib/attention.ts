@@ -12,7 +12,8 @@ export type Attention = {
   sev: 'bad' | 'hot' | 'warn' | 'mute';
   kind: AttentionKind;
   ref: string;            // order name, PO number or SKU
-  supplier?: 'LL' | 'FOUNDRY';
+  supplier?: 'LL' | 'FOUNDRY' | 'OTHER';
+  supplierLabel?: string | null;
   title: string;
   detail: string;
   orderId?: string;
@@ -42,8 +43,8 @@ export function buildAttention(input: {
     if (o.shopifySyncError && o.stage === 'SHIPPED' && !o.shopifyFulfillmentId) A.push({ ...base, sev: 'bad', kind: 'tracking-failed', title: 'Tracking did not reach Shopify', detail: o.shopifySyncError });
   }
   for (const i of invoices) {
-    const base = { ref: i.number, invoiceId: i.id, supplier: i.supplier, orderId: i.orderId ?? undefined };
-    const who = i.supplier === 'LL' ? 'LL invoice' : 'Foundry invoice';
+    const base = { ref: i.number, invoiceId: i.id, supplier: i.supplier, supplierLabel: i.supplierLabel, orderId: i.orderId ?? undefined };
+    const who = `${i.supplier === 'FOUNDRY' ? 'Foundry' : i.supplier === 'LL' ? 'LL' : i.supplierLabel || 'Supplier'} invoice`;
     if (!i.paidAt && i.dueAt < now) A.push({ ...base, sev: 'bad', kind: 'invoice-overdue', title: `${who} ${i.number} overdue · ${money(i.amountCents)}`, detail: `Was due ${duration(left(i.dueAt))} ago` });
     else if (!i.paidAt) A.push({ ...base, sev: 'mute', kind: 'invoice-due', title: `${who} ${i.number} unpaid · ${money(i.amountCents)}`, detail: `Due in ${duration(left(i.dueAt))}` });
     else if (!i.pop) A.push({ ...base, sev: 'mute', kind: 'pop-missing', title: `Proof of payment missing for ${i.number}`, detail: 'Upload the POP for the audit trail' });

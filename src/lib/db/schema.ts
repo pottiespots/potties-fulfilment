@@ -13,7 +13,7 @@ export const fileKindEnum = pgEnum('file_kind', [
   'WAYBILL', 'ARTWORK', 'OTHER', 'INVOICE', 'POP',
 ]);
 
-export const supplierEnum = pgEnum('supplier', ['FOUNDRY', 'LL']);
+export const supplierEnum = pgEnum('supplier', ['FOUNDRY', 'LL', 'OTHER']);
 
 export const poStatusEnum = pgEnum('po_status', ['ORDERED', 'IN_PRODUCTION', 'DELIVERED', 'CANCELLED']);
 
@@ -90,7 +90,8 @@ export const orderFiles = pgTable('order_files', {
   orderId: uuid('order_id').references(() => orders.id, { onDelete: 'cascade' }),
   invoiceId: uuid('invoice_id'),
   kind: fileKindEnum('kind').notNull(),
-  storageKey: text('storage_key').notNull(),
+  storageKey: text('storage_key').notNull(), // '' when the file lives in Google Drive (driveUrl)
+  driveUrl: text('drive_url'),
   filename: text('filename').notNull(),
   mime: text('mime').notNull(),
   size: integer('size').notNull(),
@@ -152,8 +153,22 @@ export const supplierInvoices = pgTable('supplier_invoices', {
   orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
   purchaseOrderId: uuid('purchase_order_id').references(() => purchaseOrders.id, { onDelete: 'set null' }),
   notes: text('notes'),
+  supplierLabel: text('supplier_label'), // e.g. "Huntlea" when supplier is OTHER
+  driveUrl: text('drive_url'), // the invoice PDF in Google Drive
+  source: text('source').notNull().default('app'), // 'app' or 'cogs-sheet'
+  paidAmountCents: integer('paid_amount_cents'),
   createdAt: ts('created_at').notNull().defaultNow(),
-}, (t) => [index('supplier_invoices_order_idx').on(t.orderId)]);
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}, (t) => [index('supplier_invoices_order_idx').on(t.orderId), uniqueIndex('supplier_invoices_number_idx').on(t.supplier, t.number)]);
+
+/** One row per run of the daily COGS-sheet routine (or any other integration). */
+export const syncRuns = pgTable('sync_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  source: text('source').notNull(),
+  ok: boolean('ok').notNull(),
+  summary: text('summary').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
 
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
@@ -167,3 +182,4 @@ export type SupplierInvoice = typeof supplierInvoices.$inferSelect;
 export type Stage = Order['stage'];
 export type FileKind = OrderFile['kind'];
 export type Role = User['role'];
+export type SyncRun = typeof syncRuns.$inferSelect;

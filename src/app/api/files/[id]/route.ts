@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const [o] = await db.select({ stage: schema.orders.stage }).from(schema.orders).where(eq(schema.orders.id, f.orderId));
     if (!o || !visibleToFoundry(o.stage)) return new NextResponse('Not found', { status: 404 });
   }
+  if (f.driveUrl) return NextResponse.redirect(f.driveUrl); // stored in Google Drive (opens with the viewer's own Google login)
   const r = await getFile(f.storageKey);
   if ('url' in r) return NextResponse.redirect(r.url);
   return new NextResponse(new Uint8Array(r.data), {
