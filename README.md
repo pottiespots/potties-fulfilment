@@ -106,7 +106,7 @@ Each system is in charge of different things:
 Every hour the script:
 1. Sends every invoice row in **8. Invoices** to the dashboard (`POST /api/integration/invoices`). Quotes and superseded rows are skipped. For each invoice it sends the next instalment due date, whether it's paid, and the PDF link it finds in Drive › Invoices or Purchase Orders.
 2. Writes a **15. Fulfilment** tab into the sheet, with each order's stage, ship-by date, courier and tracking number.
-3. Saves packing slips, proof photos and proofs of payment into **Drive › Potties › Fulfilment › #order**.
+3. Saves each order's Shopify packing slip as **Packing slip #order.pdf** into **Drive › Potties › Fulfilment › #order**, along with proof photos and proofs of payment. The PDF is also attached to the order on the dashboard (**Download PDF**).
 4. Saves Gmail attachments that mention an order number (waybills, artwork) into that folder and links them to the order.
 5. Logs the run (`POST /api/integration/report`). The result shows on **Today**, **Invoices** and **Logins → Check connections**.
 
@@ -116,6 +116,13 @@ Every hour the script:
 3. Choose the **setup** function and click **Run**. Allow the access Google asks for (Sheets, Drive, Gmail and external requests).
 
 The Netlify site must be **public**, because the app's own login protects the pages.
+
+## Packing slips
+
+Shopify doesn't let other apps download its packing slip PDF. So the dashboard builds the slip from **your store's own packing slip template**, filled in with the order from Shopify. The result is the same layout you get from Shopify admin → Print packing slip: ship to, bill to, items with images, SKU, quantities and notes.
+
+- The template is Shopify's standard one by default.
+- If you've changed yours, copy it from Shopify admin → **Settings → Shipping and delivery → Packing slips → Edit**. Paste it under **Logins → Check connections → Packing slip template**.
 
 ## Day to day
 

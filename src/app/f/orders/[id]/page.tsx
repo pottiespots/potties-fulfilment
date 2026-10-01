@@ -100,7 +100,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         <section className="sec">
           <h4>Downloads</h4>
           <div className="docs">
-            <div className="doc"><span className="n"><span className="ft">PDF</span>Packing slip {o.name}</span><a className="btn sm" href={`/api/orders/${o.id}/packing-slip`}>Download</a></div>
+            <div className="doc"><span className="n"><span className="ft">PDF</span>Packing slip {o.name}</span><a className="btn sm" href={`/api/orders/${o.id}/packing-slip`} target="_blank" rel="noreferrer">Download</a></div>
             {docs.map((f) => (
               <div className="doc" key={f.id}><span className="n"><span className="ft">{f.mime === 'application/pdf' ? 'PDF' : 'IMG'}</span>{KIND_LABEL[f.kind]}</span><a className="btn ghost sm" href={`/api/files/${f.id}`}>Download</a></div>
             ))}

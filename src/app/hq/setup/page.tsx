@@ -4,6 +4,10 @@ import { db } from '@/lib/db';
 import { syncRuns } from '@/lib/db/schema';
 import { gql, shopifyConfigured } from '@/lib/shopify';
 import { Pill } from '@/components/ui';
+import { ActForm, Submit } from '@/components/client';
+import { savePackingSlipTemplate } from '@/app/actions/hq';
+import { getPackingSlipTemplate } from '@/lib/shopify-packing-slip';
+import { orders as ordersTable } from '@/lib/db/schema';
 
 export const metadata = { title: 'Connections · Potties' };
 
@@ -41,6 +45,8 @@ export default async function Setup() {
     : { name: 'COGS sheet sync', ok: false, detail: 'INTEGRATION_TOKEN not set', fix: 'Add INTEGRATION_TOKEN (40+ random characters) in your hosting settings and in the daily routine.' });
   checks.push({ name: 'Proof approval before tracking', ok: null, detail: process.env.REQUIRE_HQ_PROOF_APPROVAL === 'true' ? 'Required' : 'Not required (HQ approval is a reminder only)' });
 
+  const slip = await getPackingSlipTemplate();
+  const [latest] = await db.select({ id: ordersTable.id, name: ordersTable.name }).from(ordersTable).orderBy(desc(ordersTable.placedAt)).limit(1);
   return (
     <main className="page narrow">
       <div className="hello"><div><h2>Connections</h2><p>Use this after going live to check everything is plugged in.</p></div></div>
@@ -57,6 +63,21 @@ export default async function Setup() {
           </tbody>
         </table>
       </div>
+      <section className="sec" style={{ marginTop: 20 }} id="packing-slip">
+        <h4>Packing slip template {slip.custom ? <Pill tone="ok">Your Shopify template</Pill> : <Pill>Shopify standard</Pill>}</h4>
+        <p className="kv" style={{ marginTop: 0 }}>
+          Packing slips use the same layout as Shopify. If you changed yours in Shopify, copy it here so they match exactly:
+          Shopify admin → <b>Settings → Shipping and delivery → Packing slips → Edit</b>, select all the code, copy, paste below and save.
+          Leave empty to use Shopify’s standard packing slip.
+          {latest && <> <a className="lnk" href={`/api/orders/${latest.id}/packing-slip`} target="_blank" rel="noreferrer">Preview with {latest.name}</a></>}
+        </p>
+        <ActForm action={savePackingSlipTemplate}>
+          <label className="field"><span className="sub2">Template code (Liquid)</span>
+            <textarea name="template" rows={10} defaultValue={slip.custom ? slip.template : ''} placeholder="Paste your Shopify packing slip template here, or leave empty for the standard one" style={{ fontFamily: 'var(--mono)', fontSize: 12 }} />
+          </label>
+          <div className="btns" style={{ marginTop: 8 }}><Submit>Save template</Submit></div>
+        </ActForm>
+      </section>
     </main>
   );
 }

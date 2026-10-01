@@ -3,7 +3,7 @@
  *
  *  1. COGS sheet "8. Invoices"  -> dashboard Invoices (amounts, next instalment due, paid, Drive PDF link)
  *  2. Dashboard orders          -> COGS sheet tab "15. Fulfilment" (stage, ship-by, courier, tracking)
- *  3. Dashboard documents       -> Drive / Potties / Fulfilment / <order> (packing slips, photos, POPs)
+ *  3. Shopify packing slips + dashboard documents -> Drive / Potties / Fulfilment / <order> (slips, photos, POPs)
  *  4. Gmail attachments that mention an order (waybills, artwork) -> Drive, linked on the order
  *  5. Logs each run on the dashboard ("COGS sheet synced ...")
  *
@@ -286,9 +286,14 @@ function archiveDocuments(exp) {
     saved++;
   }
   var i;
+  // Packing slips in the Shopify layout: HTML from the dashboard -> PDF in Drive -> PDF back on the dashboard.
+  var slips = 0;
   for (i = 0; i < exp.orders.length; i++) {
     var o = exp.orders[i];
-    if (o.packingSlipUrl) save('slip:' + o.name, o.name, 'packing-slip-' + o.name.replace('#', '') + '.pdf', o.packingSlipUrl);
+    if (!o.packingSlipUrl || o.hasPackingSlipPdf) continue;
+    if (saved + slips >= CONFIG.MAX_FILES_PER_RUN) { waiting++; continue; }
+    saveShopifyPackingSlip(root, o);
+    slips++;
   }
   for (i = 0; i < exp.files.length; i++) {
     var f = exp.files[i];
@@ -299,7 +304,24 @@ function archiveDocuments(exp) {
     if (inv.proofOfPaymentUrl) save('pop:' + inv.number, inv.orderName || 'Supplier payments', 'POP-' + inv.number + '.pdf', inv.proofOfPaymentUrl);
   }
   props.setProperty('archived', JSON.stringify(done));
-  return 'Drive: ' + saved + ' files saved' + (waiting ? ', ' + waiting + ' waiting for next run' : '');
+  return 'Drive: ' + saved + ' files saved, ' + slips + ' packing slips' + (waiting ? ', ' + waiting + ' waiting for next run' : '');
+}
+
+/** Makes the order's packing slip PDF (Shopify layout), saves it in Drive and uploads it to the dashboard. */
+function saveShopifyPackingSlip(root, o) {
+  var html = UrlFetchApp.fetch(o.packingSlipUrl, { headers: { Authorization: 'Bearer ' + CONFIG.TOKEN }, muteHttpExceptions: true });
+  if (html.getResponseCode() >= 300) throw new Error('packing slip ' + o.name + ' returned ' + html.getResponseCode());
+  var filename = 'Packing slip ' + o.name + '.pdf';
+  var pdf = Utilities.newBlob(html.getContentText(), 'text/html', 'slip.html').getAs('application/pdf').setName(filename);
+  var folder = orderFolder(root, o.name);
+  // Replace earlier versions, including the old-style "packing-slip-1234.pdf".
+  var names = [filename, 'packing-slip-' + o.name.replace('#', '') + '.pdf'];
+  for (var n = 0; n < names.length; n++) {
+    var old = folder.getFilesByName(names[n]);
+    while (old.hasNext()) old.next().setTrashed(true);
+  }
+  var file = folder.createFile(pdf);
+  api('post', '/api/integration/packing-slip', { orderName: o.name, pdfBase64: Utilities.base64Encode(pdf.getBytes()), driveUrl: file.getUrl() });
 }
 
 // ---------------------------------------------------------------- 4. Gmail attachments -> orders

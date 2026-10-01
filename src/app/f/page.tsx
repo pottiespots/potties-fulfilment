@@ -24,7 +24,7 @@ function Job({ o, now }: { o: OrderRow; now: Date }) {
         <div className="stat"><Pill tone="info">{FOUNDRY_LABEL[o.stage]}</Pill><LeftPill o={o} now={now} />{o.stage === 'PACKED' && <Pill tone="bad">Add tracking</Pill>}</div>
       </div>
       <div className="acts">
-        <a className="btn ghost sm" href={`/api/orders/${o.id}/packing-slip`}>Packing slip</a>
+        <a className="btn ghost sm" href={`/api/orders/${o.id}/packing-slip`} target="_blank" rel="noreferrer">Packing slip</a>
         <Link className="btn sm" href={`/f/orders/${o.id}`}>{o.stage === 'SENT' ? 'Review & accept' : o.stage === 'PACKED' ? 'Add tracking' : 'Open & update'}</Link>
       </div>
     </article>

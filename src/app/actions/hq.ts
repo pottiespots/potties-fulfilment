@@ -263,3 +263,22 @@ export async function goToOrder(fd: FormData) {
   const [o] = await db.select({ id: schema.orders.id }).from(schema.orders).where(and(eq(schema.orders.name, q)));
   redirect(o ? `/hq/orders/${o.id}` : `/hq/orders?q=${encodeURIComponent(q)}`);
 }
+
+// ---------------- packing slip template ----------------
+export async function savePackingSlipTemplate(_p: Res, fd: FormData): Promise<Res> {
+  await requireHQ();
+  const value = String(fd.get('template') ?? '').trim();
+  if (!value) {
+    await db.delete(schema.settings).where(eq(schema.settings.key, 'packing_slip_template'));
+    return done('Using Shopify’s standard packing slip');
+  }
+  try {
+    const { Liquid } = await import('liquidjs');
+    new Liquid().parse(value); // reject a template with broken Liquid before saving it
+  } catch (e) {
+    return { error: `That template has an error: ${(e as Error).message.slice(0, 200)}` };
+  }
+  await db.insert(schema.settings).values({ key: 'packing_slip_template', value, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } });
+  return done('Packing slip template saved');
+}

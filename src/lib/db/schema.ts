@@ -10,7 +10,7 @@ export const stageEnum = pgEnum('stage', [
 
 export const fileKindEnum = pgEnum('file_kind', [
   'PHOTO_PRODUCT', 'PHOTO_CUSTOM', 'PHOTO_PACKED', 'PHOTO_WAYBILL',
-  'WAYBILL', 'ARTWORK', 'OTHER', 'INVOICE', 'POP',
+  'WAYBILL', 'ARTWORK', 'OTHER', 'INVOICE', 'POP', 'PACKING_SLIP',
 ]);
 
 export const supplierEnum = pgEnum('supplier', ['FOUNDRY', 'LL', 'OTHER']);
@@ -64,6 +64,8 @@ export const orders = pgTable('orders', {
   proofApprovedAt: ts('proof_approved_at'),
   openQuestion: text('open_question'),
   openQuestionAt: ts('open_question_at'),
+  // Extra Shopify details used by the packing slip template (billing address, PO number, shipping method).
+  shopifyData: jsonb('shopify_data').$type<ShopifyOrderData>(),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 }, (t) => [
@@ -82,6 +84,7 @@ export const lineItems = pgTable('line_items', {
   quantity: integer('quantity').notNull(),
   customType: text('custom_type'),
   customText: text('custom_text'),
+  imageUrl: text('image_url'),
   properties: jsonb('properties').$type<{ key: string; value: string }[]>().notNull().default([]),
 }, (t) => [index('line_items_order_idx').on(t.orderId)]);
 
@@ -169,6 +172,16 @@ export const syncRuns = pgTable('sync_runs', {
   summary: text('summary').notNull(),
   createdAt: ts('created_at').notNull().defaultNow(),
 });
+
+/** Simple key/value settings (e.g. the Shopify packing slip template). */
+export const settings = pgTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+export type ShopifyAddress = { name?: string | null; firstName?: string | null; lastName?: string | null; company?: string | null; address1?: string | null; address2?: string | null; city?: string | null; province?: string | null; provinceCode?: string | null; zip?: string | null; country?: string | null; countryCodeV2?: string | null; phone?: string | null };
+export type ShopifyOrderData = { billingAddress?: ShopifyAddress | null; shippingAddress?: ShopifyAddress | null; poNumber?: string | null; shippingTitle?: string | null; note?: string | null };
 
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;

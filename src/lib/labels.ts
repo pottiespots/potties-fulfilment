@@ -3,7 +3,7 @@ import type { FileKind } from './db/schema';
 export const KIND_LABEL: Record<FileKind, string> = {
   PHOTO_PRODUCT: 'Finished product', PHOTO_CUSTOM: 'Close-up of lid / engraving', PHOTO_PACKED: 'Packed box with slip',
   PHOTO_WAYBILL: 'Waybill on box', WAYBILL: 'Courier waybill', ARTWORK: 'Lid / engraving artwork', OTHER: 'Other file',
-  INVOICE: 'Invoice', POP: 'Proof of payment',
+  INVOICE: 'Invoice', POP: 'Proof of payment', PACKING_SLIP: 'Packing slip (Shopify)',
 };
 
 /** Display name for a supplier, e.g. Foundry, LL, Huntlea. */

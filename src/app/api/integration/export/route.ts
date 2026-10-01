@@ -31,7 +31,8 @@ export async function GET(req: Request) {
       proofApproved: Boolean(o.proofApprovedAt), openQuestion: o.openQuestion,
       lines: o.lines.map((l) => ({ title: l.title, variant: l.variant, sku: l.sku, quantity: l.quantity, customType: l.customType, customText: l.customText })),
       foundryInvoice: o.invoice ? { number: o.invoice.number, paid: Boolean(o.invoice.paidAt) } : null,
-      packingSlipUrl: stageIndex(o.stage) >= stageIndex('SENT') ? `${base}/api/integration/orders/${o.id}/packing-slip` : null,
+      packingSlipUrl: `${base}/api/integration/orders/${o.id}/packing-slip`,
+      hasPackingSlipPdf: o.fileKinds.includes('PACKING_SLIP'),
       dashboardUrl: `${base}/hq/orders/${o.id}`,
     })),
     invoices: invoices.map((i) => ({
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
     })),
     stock: [...potStock, ...llStock].map((x) => ({ sku: x.sku, name: x.name, supplier: x.supplier, onHand: x.onHand, reservedForOrders: x.allocated, onOrder: x.onOrder, available: x.available, reorderLevel: x.reorderLevel })),
     // New files since `since`: proof photos, waybills, artwork, invoices and proofs of payment uploaded in the dashboard.
-    files: files.filter((f) => !f.driveUrl).map((f) => ({
+    files: files.filter((f) => !f.driveUrl && f.kind !== 'PACKING_SLIP').map((f) => ({
       id: f.id, orderName: f.orderId ? orderName.get(f.orderId) ?? null : null, kind: f.kind, filename: f.filename, mime: f.mime,
       createdAt: f.createdAt, downloadUrl: `${base}/api/integration/files/${f.id}`,
     })),

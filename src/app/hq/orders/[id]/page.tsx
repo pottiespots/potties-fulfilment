@@ -99,7 +99,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
       <Link href="/hq/orders" className="back">← Foundry orders</Link>
       <div className="ohead">
         <div><h1>{o.name} · {o.customerName}</h1><div className="sub">Placed {dayTime(o.placedAt)}{o.email ? ` · ${o.email}` : ''}</div></div>
-        <div className="btns">{shopify && <a className="btn ghost sm" href={shopify} target="_blank" rel="noreferrer">Open in Shopify</a>}<a className="btn ghost sm" href={`/api/orders/${o.id}/packing-slip`}>Packing slip</a></div>
+        <div className="btns">{shopify && <a className="btn ghost sm" href={shopify} target="_blank" rel="noreferrer">Open in Shopify</a>}<a className="btn ghost sm" href={`/api/orders/${o.id}/packing-slip`} target="_blank" rel="noreferrer">Packing slip</a></div>
       </div>
       <Stepper stage={o.stage} />
 
@@ -140,7 +140,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
           <section className="sec">
             <h4>Documents for the foundry</h4>
             <div className="docs">
-              <div className="doc"><span className="n"><span className="ft">PDF</span>Packing slip (made automatically)</span><a className="btn ghost sm" href={`/api/orders/${o.id}/packing-slip`}>Download</a></div>
+              <div className="doc"><span className="n"><span className="ft">PDF</span>Packing slip (Shopify layout)</span><a className="btn ghost sm" href={`/api/orders/${o.id}/packing-slip`} target="_blank" rel="noreferrer">Download</a></div>
               {o.files.filter((f) => f.kind === 'WAYBILL' || f.kind === 'ARTWORK').map((f) => (
                 <div className="doc" key={f.id}><span className="n"><span className="ft">{f.mime === 'application/pdf' ? 'PDF' : 'IMG'}</span>{KIND_LABEL[f.kind]}</span><a className="btn ghost sm" href={`/api/files/${f.id}`}>View</a></div>
               ))}

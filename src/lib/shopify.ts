@@ -2,6 +2,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { db, schema } from './db';
+import type { ShopifyAddress, ShopifyOrderData } from './db/schema';
 import { courierFromShippingTitle, defaultShipBy, detectCustomisation } from './rules';
 import { logEvent } from './data';
 
@@ -60,19 +61,21 @@ export function verifyWebhook(rawBody: string, hmacHeader: string | null): boole
 }
 
 const ORDER_FIELDS = `
-  id name createdAt cancelledAt note
+  id name createdAt cancelledAt note poNumber
   displayFinancialStatus displayFulfillmentStatus
-  shippingAddress { name firstName lastName company address1 address2 city province zip country phone }
+  shippingAddress { name firstName lastName company address1 address2 city province provinceCode zip country countryCodeV2 phone }
+  billingAddress { name firstName lastName company address1 address2 city province provinceCode zip country countryCodeV2 phone }
   shippingLine { title }
-  lineItems(first: 50) { nodes { id title variantTitle sku quantity requiresShipping customAttributes { key value } } }
+  lineItems(first: 50) { nodes { id title variantTitle sku quantity requiresShipping customAttributes { key value } image { url } } }
 `;
 
 type ShopifyOrder = {
-  id: string; name: string; createdAt: string; cancelledAt: string | null; note: string | null;
+  id: string; name: string; createdAt: string; cancelledAt: string | null; note: string | null; poNumber?: string | null;
+  billingAddress?: ShopifyAddress | null;
   displayFinancialStatus: string | null; displayFulfillmentStatus: string;
-  shippingAddress: { name: string | null; company: string | null; address1: string | null; address2: string | null; city: string | null; province: string | null; zip: string | null; country: string | null; phone: string | null } | null;
+  shippingAddress: (ShopifyAddress & { name: string | null; company: string | null; address1: string | null; address2: string | null; city: string | null; province: string | null; zip: string | null; country: string | null; phone: string | null }) | null;
   shippingLine: { title: string } | null;
-  lineItems: { nodes: { id: string; title: string; variantTitle: string | null; sku: string | null; quantity: number; requiresShipping: boolean; customAttributes: { key: string; value: string }[] }[] };
+  lineItems: { nodes: { id: string; title: string; variantTitle: string | null; sku: string | null; quantity: number; requiresShipping: boolean; customAttributes: { key: string; value: string }[]; image?: { url: string } | null }[] };
 };
 
 /** Creates or updates one order from Shopify. Never moves an order backwards in our pipeline. */
@@ -101,10 +104,18 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
     deliveryNote: o.note,
   };
 
+  const shopifyData: ShopifyOrderData = {
+    billingAddress: o.billingAddress ?? null, shippingAddress: o.shippingAddress ?? null,
+    poNumber: o.poNumber ?? null, shippingTitle: o.shippingLine?.title ?? null, note: o.note,
+  };
+
   if (existing) {
     // Address/notes can change in Shopify until the foundry has packed the order.
-    if (['NEW', 'SENT', 'ACCEPTED', 'MANUFACTURING', 'PACKING'].includes(existing.stage)) {
-      await db.update(schema.orders).set({ ...addr, updatedAt: new Date() }).where(eq(schema.orders.id, existing.id));
+    const editable = ['NEW', 'SENT', 'ACCEPTED', 'MANUFACTURING', 'PACKING'].includes(existing.stage);
+    await db.update(schema.orders).set({ ...(editable ? addr : {}), shopifyData, updatedAt: new Date() }).where(eq(schema.orders.id, existing.id));
+    // Fill in product images for orders synced before images were stored.
+    for (const l of o.lineItems.nodes) {
+      if (l.image?.url) await db.update(schema.lineItems).set({ imageUrl: l.image.url }).where(eq(schema.lineItems.shopifyLineId, l.id));
     }
     return 'updated';
   }
@@ -114,7 +125,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
   const lead = Number(process.env.DEFAULT_LEAD_DAYS || 7);
   const [row] = await db.insert(schema.orders).values({
     shopifyId: o.id, name: o.name, placedAt, ...addr, courier, courierService: service,
-    shipBy: defaultShipBy(placedAt, lead),
+    shipBy: defaultShipBy(placedAt, lead), shopifyData,
   }).onConflictDoNothing().returning();
   if (!row) return 'skipped'; // created concurrently by a webhook
 
@@ -124,7 +135,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
       const c = detectCustomisation(l.customAttributes);
       return {
         orderId: row.id, shopifyLineId: l.id, title: l.title, variant: l.variantTitle, sku: l.sku, quantity: l.quantity,
-        customType: c?.type ?? null, customText: c?.text ?? null, properties: l.customAttributes,
+        customType: c?.type ?? null, customText: c?.text ?? null, properties: l.customAttributes, imageUrl: l.image?.url ?? null,
       };
     }));
   }
@@ -187,4 +198,26 @@ export function explainShopifyError(status: number, json: { errors?: unknown }):
   if (status === 404) return 'Shopify store not found. Check SHOPIFY_STORE_DOMAIN (it should end in .myshopify.com).';
   const first = errs[0]?.message ?? (typeof json.errors === 'string' ? json.errors : JSON.stringify(json).slice(0, 200));
   return `Shopify error: ${first}`;
+}
+
+export type ShopInfo = { name: string; email: string | null; domain: string | null; address: ShopifyAddress | null; logoUrl: string | null };
+let shopCache: { at: number; info: ShopInfo } | null = null;
+/** Store name, email, domain and address for the packing slip (cached for an hour). */
+export async function getShopInfo(): Promise<ShopInfo> {
+  if (shopCache && Date.now() - shopCache.at < 36e5) return shopCache.info;
+  const fallback: ShopInfo = { name: 'Potties', email: null, domain: null, address: null, logoUrl: null };
+  if (!shopifyConfigured()) return fallback;
+  try {
+    type Shop = { name: string; contactEmail: string | null; primaryDomain: { host: string } | null; billingAddress: ShopifyAddress | null; brand?: { logo: { image: { url: string } | null } | null } | null };
+    const base = 'name contactEmail primaryDomain { host } billingAddress { company address1 address2 city province provinceCode zip country countryCodeV2 phone }';
+    // The brand logo field needs an extra permission on some stores; fall back to the basics without it.
+    const d = await gql<{ shop: Shop }>(`{ shop { ${base} brand { logo { image { url } } } } }`)
+      .catch(() => gql<{ shop: Shop }>(`{ shop { ${base} } }`));
+    const info: ShopInfo = { name: d.shop.name, email: d.shop.contactEmail, domain: d.shop.primaryDomain?.host ?? null, address: d.shop.billingAddress, logoUrl: d.shop.brand?.logo?.image?.url ?? null };
+    shopCache = { at: Date.now(), info };
+    return info;
+  } catch (e) {
+    console.error('[shop info]', e);
+    return fallback;
+  }
 }
