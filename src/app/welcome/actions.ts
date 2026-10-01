@@ -16,7 +16,7 @@ export async function createFirstAdmin(_p: { error?: string } | null, fd: FormDa
   const code = process.env.SETUP_CODE ?? '';
   const given = String(fd.get('code') ?? '');
   const same = code.length >= 8 && given.length === code.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(code));
-  if (!same) return { error: 'That setup code is wrong. It is the SETUP_CODE value you added in Vercel.' };
+  if (!same) return { error: 'That setup code is wrong. It is the SETUP_CODE value you added in your hosting settings.' };
   const email = String(fd.get('email') ?? '').trim().toLowerCase();
   const name = String(fd.get('name') ?? '').trim();
   const password = String(fd.get('password') ?? '');

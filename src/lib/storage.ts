@@ -13,12 +13,13 @@ function supabase() {
 }
 const localRoot = path.join(process.cwd(), '.data', 'uploads');
 
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+// Hosting platforms cap a request at ~4.5–6 MB. Photos are shrunk in the browser before upload.
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const ALLOWED = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/;
 
 export function checkUpload(file: File): string | null {
   if (!file || file.size === 0) return 'Choose a file first.';
-  if (file.size > MAX_UPLOAD_BYTES) return 'That file is larger than 8 MB.';
+  if (file.size > MAX_UPLOAD_BYTES) return 'That file is larger than 4 MB. Photos are shrunk automatically; for a big PDF, save it smaller first.';
   if (!ALLOWED.test(file.type)) return 'Upload a photo (JPG, PNG, HEIC) or a PDF.';
   return null;
 }
@@ -30,7 +31,7 @@ export async function putFile(key: string, data: Buffer, mime: string) {
     if (error) throw new Error(`Upload failed: ${error.message}`);
     return;
   }
-  if (process.env.VERCEL) throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+  if (process.env.VERCEL || process.env.NETLIFY) throw new Error('File storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   const p = path.join(localRoot, key);
   await mkdir(path.dirname(p), { recursive: true });
   await writeFile(p, data);

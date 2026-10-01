@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Photos are resized in the browser before upload; PDFs (invoices, waybills) can be a few MB.
-  experimental: { serverActions: { bodySizeLimit: '8mb' } },
+  // Photos are resized in the browser before upload; uploads are capped at 4 MB (see lib/storage.ts).
+  experimental: { serverActions: { bodySizeLimit: '5mb' } },
   serverExternalPackages: ['postgres'],
 };
 

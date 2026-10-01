@@ -87,16 +87,17 @@ export function CheckToggle({ action, checked, disabled, children }: { action: (
   );
 }
 
-/** Shrinks phone photos in the browser (max 2000 px, JPEG) so uploads are quick on mobile data. */
+/** Shrinks phone photos in the browser (max 1600 px, JPEG ~300 KB) so uploads are quick on mobile data
+ *  and the free storage tier lasts. */
 async function shrink(file: File): Promise<File> {
-  if (!file.type.startsWith('image/') || file.size < 900_000) return file;
+  if (!file.type.startsWith('image/') || file.size < 400_000) return file;
   try {
     const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
     const c = document.createElement('canvas');
     c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
     c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
-    const blob: Blob | null = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.85));
+    const blob: Blob | null = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.8));
     if (!blob) return file;
     return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
   } catch {

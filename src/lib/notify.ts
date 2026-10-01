@@ -23,7 +23,7 @@ export async function sendEmail(to: string | undefined | null, subject: string, 
   }
 }
 
-const app = () => process.env.APP_URL || 'http://localhost:3000';
+const app = () => process.env.APP_URL || process.env.URL || 'http://localhost:3000';
 
 export const notifyFoundry = (subject: string, body: string, path = '/f') =>
   sendEmail(process.env.FOUNDRY_NOTIFY_EMAIL, subject, `${body}\n\nOpen the order desk: ${app()}${path}`);

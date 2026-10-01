@@ -21,17 +21,17 @@ export default async function Setup() {
     } catch (e) {
       checks.push({ name: 'Shopify', ok: false, detail: (e as Error).message, fix: 'Check SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET, and that the app is installed on your store.' });
     }
-  } else checks.push({ name: 'Shopify', ok: false, detail: 'Not connected yet', fix: 'Add SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET in Vercel.' });
+  } else checks.push({ name: 'Shopify', ok: false, detail: 'Not connected yet', fix: 'Add SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET in your hosting settings.' });
 
   checks.push(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? { name: 'File storage', ok: true, detail: `Supabase bucket “${process.env.SUPABASE_BUCKET || 'fulfilment'}”` }
-    : { name: 'File storage', ok: !process.env.VERCEL ? null : false, detail: process.env.VERCEL ? 'Not set: photos and invoices can’t be uploaded' : 'Local disk (development only)', fix: 'Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' });
+    : { name: 'File storage', ok: !(process.env.VERCEL || process.env.NETLIFY) ? null : false, detail: (process.env.VERCEL || process.env.NETLIFY) ? 'Not set: photos and invoices can’t be uploaded' : 'Local disk (development only)', fix: 'Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' });
   checks.push(process.env.RESEND_API_KEY
     ? { name: 'Email', ok: true, detail: `Foundry: ${process.env.FOUNDRY_NOTIFY_EMAIL || 'not set'} · HQ: ${process.env.HQ_NOTIFY_EMAIL || 'not set'} · LL: ${process.env.LL_ORDER_EMAIL || 'not set'}` }
     : { name: 'Email', ok: null, detail: 'Off. Reminders are only written in the order history.', fix: 'Optional: add RESEND_API_KEY and the notify emails.' });
   checks.push(process.env.CRON_SECRET
-    ? { name: 'Daily reminders', ok: true, detail: 'Runs at 07:00 Mon–Sat' }
-    : { name: 'Daily reminders', ok: false, detail: 'CRON_SECRET not set, so the morning job is switched off', fix: 'Add CRON_SECRET (any long random text) in Vercel.' });
+    ? { name: 'Daily reminders', ok: true, detail: 'Runs at 07:00 Mon–Sat (also keeps the free Supabase project awake)' }
+    : { name: 'Daily reminders', ok: false, detail: 'CRON_SECRET not set, so the morning job is switched off', fix: 'Add CRON_SECRET (any long random text) in your hosting settings.' });
   checks.push({ name: 'Proof approval before tracking', ok: null, detail: process.env.REQUIRE_HQ_PROOF_APPROVAL === 'true' ? 'Required' : 'Not required (HQ approval is a reminder only)' });
 
   return (

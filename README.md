@@ -2,7 +2,7 @@
 
 One secure web app for the whole order pipeline: **Shopify order → Potties HQ check → foundry accepts → manufacturing → packing (with proof photos and customisation check) → courier collects → tracking sent to the customer via Shopify → delivered**. It also covers LL Manufacturing purchase orders, covers & accessories stock, and every supplier invoice and proof of payment.
 
-Built with Next.js 16, PostgreSQL (Drizzle ORM) and Supabase Storage. Hosted on Vercel + Supabase.
+Built with Next.js 16, PostgreSQL (Drizzle ORM) and Supabase Storage. Runs on the free plans of **Netlify** (hosting) and **Supabase** (database and files). `vercel.json` is included in case you move to Vercel later.
 
 ## Who sees what
 
@@ -27,7 +27,7 @@ The foundry can’t open any HQ page, and every file download checks the login. 
 - Tracking can only be added once an order is packed. Set `REQUIRE_HQ_PROOF_APPROVAL=true` to also require HQ to approve the photos first.
 - Every action is written to the order’s history with who did it and when.
 
-## Going live (about an hour)
+## Going live (about an hour, all on free plans)
 
 ### 1. Supabase (database and file storage)
 1. Create a project at [supabase.com](https://supabase.com) (region: *South Africa* or *EU West*).
@@ -37,17 +37,26 @@ The foundry can’t open any HQ page, and every file download checks the login. 
    - **Project Settings → API → Project URL**. This is `SUPABASE_URL`.
    - **Project Settings → API → service_role key**. This is `SUPABASE_SERVICE_ROLE_KEY`. Keep it secret.
 
-### 2. Vercel (hosting)
-1. At [vercel.com](https://vercel.com), choose **Add New → Project** and import this GitHub repository.
-2. Set **Build command** to `npm run db:migrate && npm run build`. Database changes are then applied on every deploy.
-3. Add the environment variables from `.env.example`. You need at least:
-   - `DATABASE_URL`, `SESSION_SECRET` (run `openssl rand -base64 32`), `APP_URL`
+### 2. Netlify (hosting)
+1. Sign up at [netlify.com](https://netlify.com) with GitHub. Choose **Add new site → Import an existing project → GitHub** and pick this repository.
+2. The build settings come from `netlify.toml`, so leave them as they are. The build runs `npm run db:migrate && npm run build`, which applies database changes on every deploy.
+3. Under **Environment variables**, add the values from `.env.example`. You need at least:
+   - `DATABASE_URL`, `SESSION_SECRET` (any 32+ random characters), `APP_URL`
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET=fulfilment`
    - `CRON_SECRET` and `SETUP_CODE` (any long random text)
-4. Deploy. To use your own address, e.g. `orders.potties.co.za`, add it under **Settings → Domains**.
+4. Deploy. Under **Site configuration → Change site name**, choose a name like `potties-orders`, which gives `https://potties-orders.netlify.app`. Set `APP_URL` to that address and redeploy. You can add your own domain later under **Domain management**.
+
+The daily 07:00 job runs as a Netlify scheduled function (`netlify/functions/daily-reminders.mts`).
+
+**Free plan limits to know about**
+- **Netlify:** 300 credits a month, which is plenty for a team of a few people.
+- **Supabase:**
+  - 500 MB database and 1 GB file storage. Photos are shrunk to about 300 KB, so that's roughly 800 orders of photos. After that, delete old photos or upgrade.
+  - Free projects pause after a week with no activity. The daily job keeps the project awake.
+- **Uploads:** each file can be up to 4 MB.
 
 ### 3. First login
-Open your app’s address. Because there are no logins yet, it shows **First-time setup**. Enter the `SETUP_CODE` you added in Vercel and create your Potties HQ login. The page closes for good once a login exists. Then add the foundry’s login under **Logins** and choose “Foundry” as the access.
+Open your app’s address. Because there are no logins yet, it shows **First-time setup**. Enter the `SETUP_CODE` you added in Netlify and create your Potties HQ login. The page closes for good once a login exists. Then add the foundry’s login under **Logins** and choose “Foundry” as the access.
 
 ### 4. Shopify
 Since January 2026, Shopify makes new private apps in the **Dev Dashboard**. They no longer give a permanent token; the app logs in with a client ID and secret.
@@ -65,7 +74,7 @@ Since January 2026, Shopify makes new private apps in the **Dev Dashboard**. The
    - Go to Shopify admin → **Settings → Notifications → Webhooks**.
    - Add `Order creation`, `Order update`, `Order cancellation` and `Fulfillment update`, all in JSON format, each pointing to `https://<your app>/api/shopify/webhooks`.
    - Copy the signing key shown on that page into `SHOPIFY_WEBHOOK_SECRET`.
-6. Redeploy on Vercel. In the app, go to **Logins → Check connections**, which should say Shopify is *Working*. Then press **Sync Shopify**.
+6. Redeploy on Netlify. In the app, go to **Logins → Check connections**, which should say Shopify is *Working*. Then press **Sync Shopify**.
 
 If you still have an older custom app with a permanent `shpat_` token, put it in `SHOPIFY_ADMIN_TOKEN` instead of the client ID and secret.
 
