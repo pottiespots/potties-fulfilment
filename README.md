@@ -1,0 +1,112 @@
+# Potties Order Desk
+
+One secure web app for the whole order pipeline: **Shopify order → Potties HQ check → foundry accepts → manufacturing → packing (with proof photos and customisation check) → courier collects → tracking sent to the customer via Shopify → delivered**. It also covers LL Manufacturing purchase orders, covers & accessories stock, and every supplier invoice and proof of payment.
+
+Built with Next.js 16, PostgreSQL (Drizzle ORM) and Supabase Storage. Hosted on Vercel + Supabase.
+
+## Who sees what
+
+| | Foundry login | Potties HQ login |
+|---|---|---|
+| Orders | Only orders HQ has sent them | All orders |
+| Accept / ask a question | ✓ | — |
+| Change status (Accepted → Manufacturing → Packing → Packed) | ✓ | ✓ (correction, logged) |
+| Download packing slip, waybill, artwork | ✓ | ✓ |
+| Upload proof photos | ✓ | ✓ |
+| Add tracking (sent to Shopify, customer emailed) | ✓ | ✓ |
+| Notes | ✓ | ✓ plus **HQ-only** notes the foundry never sees |
+| Own invoice status (paid / awaiting) | ✓ | ✓ |
+| Invoices, proof of payment, LL Manufacturing, stock, logins | — | ✓ |
+
+The foundry can’t open any HQ page, and every file download checks the login. Invoices and proofs of payment are never served to a foundry login.
+
+**Compliance rules built in**
+
+- HQ must tick “checked customisation and address” before sending to the foundry. Any change to the custom text is recorded.
+- The foundry can’t mark **Packed** until it has ticked the customisation check and “packing slip is in the box”, and uploaded a photo of the packed box.
+- Tracking can only be added once an order is packed. Set `REQUIRE_HQ_PROOF_APPROVAL=true` to also require HQ to approve the photos first.
+- Every action is written to the order’s history with who did it and when.
+
+## Going live (about an hour)
+
+### 1. Supabase (database and file storage)
+1. Create a project at [supabase.com](https://supabase.com) (region: *South Africa* or *EU West*).
+2. **Storage → New bucket** named `fulfilment`. Leave it **private**.
+3. Keep these three values for step 2:
+   - **Project Settings → Database → Connection string → Transaction pooler**. This is `DATABASE_URL`.
+   - **Project Settings → API → Project URL**. This is `SUPABASE_URL`.
+   - **Project Settings → API → service_role key**. This is `SUPABASE_SERVICE_ROLE_KEY`. Keep it secret.
+
+### 2. Vercel (hosting)
+1. At [vercel.com](https://vercel.com), choose **Add New → Project** and import this GitHub repository.
+2. Set **Build command** to `npm run db:migrate && npm run build`. Database changes are then applied on every deploy.
+3. Add the environment variables from `.env.example`. You need at least:
+   - `DATABASE_URL`, `SESSION_SECRET` (run `openssl rand -base64 32`), `APP_URL`
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET=fulfilment`
+   - `CRON_SECRET` (any long random string)
+4. Deploy. To use your own address, e.g. `orders.potties.co.za`, add it under **Settings → Domains**.
+
+### 3. First login
+On your computer, with `DATABASE_URL` set to the Supabase URL:
+```bash
+npm install
+DATABASE_URL="postgres://..." npm run user:create -- --email you@potties.co.za --name "Your Name" --role HQ --password "a-long-password"
+```
+After that, sign in and add the foundry’s login under **Logins**. Choose “Foundry” as the access.
+
+### 4. Shopify
+1. In Shopify admin, go to **Settings → Apps and sales channels → Develop apps → Create an app** and name it “Potties Order Desk”.
+2. Under **Admin API scopes**, tick:
+   - `read_orders`
+   - `read_merchant_managed_fulfillment_orders`, `write_merchant_managed_fulfillment_orders`
+   - `read_fulfillments`, `write_fulfillments`
+3. Install the app. Copy the **Admin API access token** into `SHOPIFY_ADMIN_TOKEN`, and the **API secret key** into `SHOPIFY_WEBHOOK_SECRET`. Set `SHOPIFY_STORE_DOMAIN` to `your-store.myshopify.com`.
+4. Go to **Settings → Notifications → Webhooks** and add these events, each pointing to `https://<your app>/api/shopify/webhooks` in JSON format:
+   - `Order creation`, `Order update`, `Order cancellation`, `Fulfillment update`
+5. Redeploy on Vercel, then press **Sync Shopify** in the app. Paid, unfulfilled orders from the last 60 days come in.
+
+**How customisation is detected:** the sync reads the order line’s custom properties (cart attributes). Any property whose name includes *engraving, lid, cast, name, initials, monogram, personal, custom, text* or *message* is shown to the foundry as the customisation. Properties starting with `_` are ignored.
+
+### 5. Email notifications (optional, recommended)
+Create a free [Resend](https://resend.com) account and verify your domain. Then set:
+- `RESEND_API_KEY`, `EMAIL_FROM`
+- `HQ_NOTIFY_EMAIL`, `FOUNDRY_NOTIFY_EMAIL`
+- `LL_ORDER_EMAIL` (purchase orders are emailed to LL)
+
+Emails sent:
+- **To the foundry:** each new order, HQ replies, requests for new photos, reminders, and a 07:00 summary of deadlines (Mon–Sat).
+- **To HQ:** foundry questions, problems flagged by the foundry, failed tracking pushes, and a daily summary.
+
+Without email set up, the app still works. Reminders are recorded in the order history only.
+
+### 6. Your real products
+Under **Pot stock** and **LL Manufacturing**, add your products. Use **the same SKUs as Shopify**: stock reserved for open orders is matched by SKU.
+
+## Day to day
+
+- **Potties HQ** starts on **Today**. It lists everything that needs you (new orders to send, foundry questions, late orders, proof to approve, invoices due, low stock), each with a button to act.
+- **The foundry** starts on **My orders**, sorted by ship-by date. They tap an order to accept it, change its status, upload photos, download the packing slip and add tracking. The **Deadlines** tab shows a two-week timeline.
+- **Invoices**: attach the foundry’s Xero invoice on the order screen and LL’s invoice on its purchase order. Then mark it paid and upload the proof of payment. The **Invoices** tab shows what’s still owed to each supplier.
+
+## Not built yet (next steps)
+
+- **Automatic import of Xero invoices from Gmail.** For now, invoices are attached by hand: upload the PDF on the order or purchase order. Automatic import needs a Google Cloud app with Gmail access.
+- Users can’t reset their own password yet. HQ sets new passwords on the **Logins** page.
+- Deliveries are marked delivered automatically when Shopify receives courier tracking updates. Not every South African courier reports deliveries to Shopify, so HQ can also press **Mark delivered**.
+
+## Local development
+
+Needs Node 20+ and PostgreSQL.
+```bash
+cp .env.example .env.local        # set DATABASE_URL and SESSION_SECRET
+npm install
+npm run db:migrate
+npm run db:seed                    # example data; only runs on an empty database
+npm run dev                        # http://localhost:3000
+```
+Example logins after seeding: `hq@example.com` / `foundry@example.com`, password `potties-demo-2026`.
+Without Supabase keys, uploaded files are stored in `.data/uploads`.
+
+Checks: `npm test` (business rules, attention list, webhook signature) and `npm run lint` (TypeScript).
+
+After changing `src/lib/db/schema.ts`, run `npm run db:generate` and commit the new file in `drizzle/`.
