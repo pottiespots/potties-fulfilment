@@ -1,11 +1,11 @@
 'use client';
-import { useActionState } from 'react';
+import { useActForm } from '@/components/client';
 import { login } from './actions';
 
 export function LoginForm() {
-  const [r, run, pending] = useActionState(login, null);
+  const { r, pending, onSubmit } = useActForm(login);
   return (
-    <form action={run} className="stack">
+    <form onSubmit={onSubmit} className="stack">
       <label className="field">Email<input id="email" name="email" type="email" autoComplete="username" required /></label>
       <label className="field">Password<input id="password" name="password" type="password" autoComplete="current-password" required /></label>
       {r?.error && <div className="flash err" role="alert">{r.error}</div>}

@@ -1,6 +1,5 @@
 'use client';
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
-import { useFormStatus } from 'react-dom';
+import { createContext, useContext, useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -12,23 +11,44 @@ function Msg({ r }: { r: Res }) {
   return r.error ? <div className="flash err" role="alert">{r.error}</div> : r.ok ? <div className="flash ok" role="status">{r.ok}</div> : null;
 }
 
+const Pending = createContext(false);
+
 export function Submit({ children, className = 'btn', disabled }: { children: React.ReactNode; className?: string; disabled?: boolean }) {
-  const { pending } = useFormStatus();
+  const pending = useContext(Pending);
   return <button className={className} disabled={disabled || pending} aria-busy={pending}>{pending ? 'Saving…' : children}</button>;
 }
 
-/** A form bound to a server action; shows the result under the fields. */
+/** Runs a server action on submit and shows the result. Unlike <form action>, it keeps what was
+ *  typed when the action returns an error (React 19 resets action forms after every submit). */
+export function useActForm(action: FormAction, resetOnOk?: boolean) {
+  const [r, setR] = useState<Res>(null);
+  const [pending, start] = useTransition();
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form, (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null);
+    start(async () => {
+      const res = await action(r, fd);
+      setR(res);
+      if (res?.ok && resetOnOk) form.reset();
+    });
+  };
+  return { r, pending, onSubmit };
+}
+
 export function ActForm({ action, children, className, resetOnOk, id }: { action: FormAction; children: React.ReactNode; className?: string; resetOnOk?: boolean; id?: string }) {
-  const [r, run] = useActionState(action, null);
-  const ref = useRef<HTMLFormElement>(null);
-  useEffect(() => { if (r?.ok && resetOnOk) ref.current?.reset(); }, [r, resetOnOk]);
+  const { r, pending, onSubmit } = useActForm(action, resetOnOk);
   return (
-    <form action={run} className={className} ref={ref} id={id}>
-      {children}
-      <Msg r={r} />
-    </form>
+    <Pending.Provider value={pending}>
+      <form onSubmit={onSubmit} className={className} id={id}>
+        {children}
+        <Msg r={r} />
+      </form>
+    </Pending.Provider>
   );
 }
+
+export { Msg };
 
 /** One-click action button (accept, approve, mark paid…). */
 export function ActButton({ action, children, className = 'btn', confirm }: { action: () => Promise<Res>; children: React.ReactNode; className?: string; confirm?: string }) {

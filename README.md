@@ -43,16 +43,11 @@ The foundry can’t open any HQ page, and every file download checks the login. 
 3. Add the environment variables from `.env.example`. You need at least:
    - `DATABASE_URL`, `SESSION_SECRET` (run `openssl rand -base64 32`), `APP_URL`
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET=fulfilment`
-   - `CRON_SECRET` (any long random string)
+   - `CRON_SECRET` and `SETUP_CODE` (any long random text)
 4. Deploy. To use your own address, e.g. `orders.potties.co.za`, add it under **Settings → Domains**.
 
 ### 3. First login
-On your computer, with `DATABASE_URL` set to the Supabase URL:
-```bash
-npm install
-DATABASE_URL="postgres://..." npm run user:create -- --email you@potties.co.za --name "Your Name" --role HQ --password "a-long-password"
-```
-After that, sign in and add the foundry’s login under **Logins**. Choose “Foundry” as the access.
+Open your app’s address. Because there are no logins yet, it shows **First-time setup**. Enter the `SETUP_CODE` you added in Vercel and create your Potties HQ login. The page closes for good once a login exists. Then add the foundry’s login under **Logins** and choose “Foundry” as the access.
 
 ### 4. Shopify
 Since January 2026, Shopify makes new private apps in the **Dev Dashboard**. They no longer give a permanent token; the app logs in with a client ID and secret.
