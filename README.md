@@ -55,17 +55,26 @@ DATABASE_URL="postgres://..." npm run user:create -- --email you@potties.co.za -
 After that, sign in and add the foundry’s login under **Logins**. Choose “Foundry” as the access.
 
 ### 4. Shopify
-1. In Shopify admin, go to **Settings → Apps and sales channels → Develop apps → Create an app** and name it “Potties Order Desk”.
-2. Under **Admin API scopes**, tick:
+Since January 2026, Shopify makes new private apps in the **Dev Dashboard**. They no longer give a permanent token; the app logs in with a client ID and secret.
+1. In Shopify admin, go to **Settings → Apps → Develop apps** and choose **Build apps in Dev Dashboard**. Create an app called “Potties Order Desk”.
+   - Create it from **your own store’s account**. Shopify only lets an app log in like this when the app and the store belong to the same organisation.
+2. In the app’s **Configuration / Versions**, set the Admin API scopes:
    - `read_orders`
    - `read_merchant_managed_fulfillment_orders`, `write_merchant_managed_fulfillment_orders`
    - `read_fulfillments`, `write_fulfillments`
-3. Install the app. Copy the **Admin API access token** into `SHOPIFY_ADMIN_TOKEN`, and the **API secret key** into `SHOPIFY_WEBHOOK_SECRET`. Set `SHOPIFY_STORE_DOMAIN` to `your-store.myshopify.com`.
-4. Go to **Settings → Notifications → Webhooks** and add these events, each pointing to `https://<your app>/api/shopify/webhooks` in JSON format:
-   - `Order creation`, `Order update`, `Order cancellation`, `Fulfillment update`
-5. Redeploy on Vercel, then press **Sync Shopify** in the app. Paid, unfulfilled orders from the last 60 days come in.
 
-**How customisation is detected:** the sync reads the order line’s custom properties (cart attributes). Any property whose name includes *engraving, lid, cast, name, initials, monogram, personal, custom, text* or *message* is shown to the foundry as the customisation. Properties starting with `_` are ignored.
+   Then **release** the version.
+3. **Install** the app on your store (Home → Install app).
+4. From **Settings / Client credentials**, copy the **Client ID** into `SHOPIFY_CLIENT_ID` and the **Client secret** into `SHOPIFY_CLIENT_SECRET`. Set `SHOPIFY_STORE_DOMAIN` to `your-store.myshopify.com`.
+5. Webhooks make new orders appear instantly. Without them, orders still come in when you press **Sync Shopify** and every morning. To add them:
+   - Go to Shopify admin → **Settings → Notifications → Webhooks**.
+   - Add `Order creation`, `Order update`, `Order cancellation` and `Fulfillment update`, all in JSON format, each pointing to `https://<your app>/api/shopify/webhooks`.
+   - Copy the signing key shown on that page into `SHOPIFY_WEBHOOK_SECRET`.
+6. Redeploy on Vercel. In the app, go to **Logins → Check connections**, which should say Shopify is *Working*. Then press **Sync Shopify**.
+
+If you still have an older custom app with a permanent `shpat_` token, put it in `SHOPIFY_ADMIN_TOKEN` instead of the client ID and secret.
+
+**How customisation is detected:** the sync reads each order line's custom properties. Any property whose name includes *engraving, lid, cast, name, initials, monogram, personal, custom, text* or *message* is shown to the foundry as the customisation. Properties starting with `_` are ignored.
 
 ### 5. Email notifications (optional, recommended)
 Create a free [Resend](https://resend.com) account and verify your domain. Then set:

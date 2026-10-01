@@ -6,18 +6,43 @@ import { courierFromShippingTitle, defaultShipBy, detectCustomisation } from './
 import { logEvent } from './data';
 
 const domain = () => process.env.SHOPIFY_STORE_DOMAIN;
-const token = () => process.env.SHOPIFY_ADMIN_TOKEN;
 const version = () => process.env.SHOPIFY_API_VERSION || '2026-07';
-export const shopifyConfigured = () => Boolean(domain() && token());
+const clientId = () => process.env.SHOPIFY_CLIENT_ID;
+const clientSecret = () => process.env.SHOPIFY_CLIENT_SECRET;
+
+// Two ways to connect:
+//  - Dev Dashboard app (all new apps since Jan 2026): SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET.
+//    We swap them for a 24-hour access token (client credentials grant) and renew it automatically.
+//  - Older custom app made in Shopify admin: a permanent SHOPIFY_ADMIN_TOKEN (shpat_...).
+export const shopifyConfigured = () => Boolean(domain() && (process.env.SHOPIFY_ADMIN_TOKEN || (clientId() && clientSecret())));
+
+let cached: { token: string; expires: number } | null = null;
+async function accessToken(): Promise<string> {
+  if (process.env.SHOPIFY_ADMIN_TOKEN) return process.env.SHOPIFY_ADMIN_TOKEN;
+  if (cached && cached.expires > Date.now() + 5 * 60e3) return cached.token;
+  const res = await fetch(`https://${domain()}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId()!, client_secret: clientSecret()! }),
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.access_token) {
+    throw new Error(`Shopify refused the app login (${res.status} ${json.error ?? ''} ${json.error_description ?? ''}). Check the client ID/secret and that the app is installed on the store.`);
+  }
+  cached = { token: json.access_token, expires: Date.now() + (Number(json.expires_in) || 3600) * 1000 };
+  return cached.token;
+}
 
 export async function gql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-  if (!shopifyConfigured()) throw new Error('Shopify is not connected. Set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.');
+  if (!shopifyConfigured()) throw new Error('Shopify is not connected. Set SHOPIFY_STORE_DOMAIN and SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET.');
   const res = await fetch(`https://${domain()}/admin/api/${version()}/graphql.json`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token()! },
+    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': await accessToken() },
     body: JSON.stringify({ query, variables }),
     cache: 'no-store',
   });
+  if (res.status === 401) cached = null;
   const json = await res.json();
   if (!res.ok || json.errors) throw new Error(`Shopify error: ${JSON.stringify(json.errors ?? json).slice(0, 300)}`);
   return json.data as T;
@@ -25,7 +50,9 @@ export async function gql<T>(query: string, variables: Record<string, unknown> =
 
 /** Verifies the X-Shopify-Hmac-Sha256 header against the raw request body. */
 export function verifyWebhook(rawBody: string, hmacHeader: string | null): boolean {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  // Webhooks from a Dev Dashboard app are signed with the app's client secret; webhooks added under
+  // Settings > Notifications are signed with the key shown on that page.
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET || clientSecret();
   if (!secret || !hmacHeader) return false;
   const digest = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('base64');
   const a = Buffer.from(digest), b = Buffer.from(hmacHeader);

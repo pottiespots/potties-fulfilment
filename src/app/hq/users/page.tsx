@@ -13,7 +13,7 @@ export default async function Users() {
   const users = await db.select().from(schema.users).orderBy(asc(schema.users.role), asc(schema.users.name));
   return (
     <main className="page narrow">
-      <div className="hello"><div><h2>Logins</h2><p>Foundry logins only ever see the foundry’s own orders. Potties HQ logins see everything.</p></div></div>
+      <div className="hello"><div><h2>Logins</h2><p>Foundry logins only ever see the foundry’s own orders. Potties HQ logins see everything.</p></div><a className="btn ghost" href="/hq/setup">Check connections</a></div>
       <div className="tbl-wrap" style={{ marginBottom: 20 }}>
         <table style={{ minWidth: 640 }}>
           <thead><tr><th>Name</th><th>Access</th><th>Last signed in</th><th>Status</th><th /></tr></thead>

@@ -18,3 +18,26 @@ describe('Shopify webhook signature', async () => {
     expect(verifyWebhook(body, null)).toBe(false);
   });
 });
+
+describe('Shopify app login (client credentials)', () => {
+  it('swaps the client ID/secret for a token once and reuses it', async () => {
+    vi.resetModules();
+    process.env.SHOPIFY_STORE_DOMAIN = 'potties.myshopify.com';
+    process.env.SHOPIFY_CLIENT_ID = 'cid';
+    process.env.SHOPIFY_CLIENT_SECRET = 'csecret';
+    delete process.env.SHOPIFY_ADMIN_TOKEN;
+    const calls: { url: string; body?: string; token?: string }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, body: String(init.body), token: (init.headers as Record<string, string>)['X-Shopify-Access-Token'] });
+      if (url.endsWith('/admin/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'shpat_temp', expires_in: 86399 }));
+      return new Response(JSON.stringify({ data: { shop: { name: 'Potties' } } }));
+    }));
+    const { gql } = await import('./shopify');
+    await gql('{ shop { name } }');
+    await gql('{ shop { name } }');
+    expect(calls.filter((c) => c.url.endsWith('/access_token'))).toHaveLength(1);
+    expect(calls[0].body).toContain('grant_type=client_credentials');
+    expect(calls[1].token).toBe('shpat_temp');
+    vi.unstubAllGlobals();
+  });
+});
