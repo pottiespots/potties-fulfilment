@@ -54,21 +54,22 @@ export type OrderDetail = OrderRow & { files: OrderFile[]; events: Event[]; invo
 /** One order with everything on it. Returns null if this role may not see it. */
 export async function getOrder(id: string, role: Role): Promise<OrderDetail | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+  // One round of parallel queries: the database is far from the server on the free plans,
+  // so every sequential query adds noticeable delay.
+  const [[o], lines, allFiles, allEvents, [invoice]] = await Promise.all([
+    db.select().from(schema.orders).where(eq(schema.orders.id, id)),
+    db.select().from(schema.lineItems).where(eq(schema.lineItems.orderId, id)),
+    db.select().from(schema.orderFiles).where(eq(schema.orderFiles.orderId, id)).orderBy(asc(schema.orderFiles.createdAt)),
+    db.select().from(schema.events).where(eq(schema.events.orderId, id)).orderBy(desc(schema.events.createdAt)),
+    db.select().from(schema.supplierInvoices).where(and(eq(schema.supplierInvoices.orderId, id), eq(schema.supplierInvoices.supplier, 'FOUNDRY'))),
+  ]);
   if (!o) return null;
   if (role === 'FOUNDRY' && !visibleToFoundry(o.stage)) return null;
-  const [row] = await attach([o], role);
-  let files = await db.select().from(schema.orderFiles).where(eq(schema.orderFiles.orderId, id)).orderBy(asc(schema.orderFiles.createdAt));
-  let events = await db.select().from(schema.events).where(eq(schema.events.orderId, id)).orderBy(desc(schema.events.createdAt));
-  if (role === 'FOUNDRY') {
-    files = files.filter((f) => f.kind !== 'INVOICE' && f.kind !== 'POP');
-    events = events.filter((e) => !e.internal);
-  }
-  const invoicePop = row.invoice
-    ? (await db.select({ id: schema.orderFiles.id }).from(schema.orderFiles)
-        .where(and(eq(schema.orderFiles.invoiceId, row.invoice.id), eq(schema.orderFiles.kind, 'POP')))).length > 0
-    : false;
-  return { ...row, files, events, invoicePop };
+  // Proof-of-payment files are stored with the order id, so they are already in allFiles.
+  const invoicePop = !!invoice && allFiles.some((f) => f.invoiceId === invoice.id && f.kind === 'POP');
+  const files = role === 'FOUNDRY' ? allFiles.filter((f) => f.kind !== 'INVOICE' && f.kind !== 'POP') : allFiles;
+  const events = role === 'FOUNDRY' ? allEvents.filter((e) => !e.internal) : allEvents;
+  return { ...o, lines, fileKinds: allFiles.map((f) => f.kind), invoice: invoice ?? null, files, events, invoicePop };
 }
 
 export async function logEvent(e: {
@@ -87,9 +88,11 @@ export async function touch(orderId: string, patch: Partial<Order>) {
 
 // ---------- suppliers ----------
 export async function invoicesWithPop() {
-  const invs = await db.select().from(schema.supplierInvoices).orderBy(asc(schema.supplierInvoices.dueAt));
-  const files = await db.select({ invoiceId: schema.orderFiles.invoiceId, kind: schema.orderFiles.kind, id: schema.orderFiles.id })
-    .from(schema.orderFiles).where(isNotNull(schema.orderFiles.invoiceId));
+  const [invs, files] = await Promise.all([
+    db.select().from(schema.supplierInvoices).orderBy(asc(schema.supplierInvoices.dueAt)),
+    db.select({ invoiceId: schema.orderFiles.invoiceId, kind: schema.orderFiles.kind, id: schema.orderFiles.id })
+      .from(schema.orderFiles).where(isNotNull(schema.orderFiles.invoiceId)),
+  ]);
   return invs.map((i) => ({
     ...i,
     pop: files.some((f) => f.invoiceId === i.id && f.kind === 'POP'),

@@ -391,3 +391,11 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .ok-text{color:var(--ok);font-size:12px;max-width:340px}
 .top .act-err,.top .ok-text{position:absolute;top:100%;right:16px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:30}
 .top{position:sticky}
+/* loading skeletons */
+.sk{background:linear-gradient(90deg,var(--line) 0%,color-mix(in srgb,var(--line) 40%,var(--surface)) 50%,var(--line) 100%);background-size:200% 100%;border-radius:8px}
+@media (prefers-reduced-motion:no-preference){.sk{animation:sk 1.2s ease-in-out infinite}@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}}
+.sk-title{height:28px;width:min(320px,70%);margin-bottom:8px}
+.sk-sub{height:14px;width:min(420px,90%);margin-bottom:22px}
+.sk-num{height:26px;width:60px;margin-bottom:8px}
+.sk-line{height:12px;width:80%}
+.sk-row{height:78px;border-radius:var(--r)}
