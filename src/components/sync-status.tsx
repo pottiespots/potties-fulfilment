@@ -7,7 +7,7 @@ export async function SyncStatus() {
   const [last] = await db.select().from(schema.syncRuns).orderBy(desc(schema.syncRuns.createdAt)).limit(1);
   const sheet = process.env.COGS_SHEET_URL;
   if (!last) {
-    return <p className="sub2" style={{ margin: '-8px 0 14px' }}>COGS sheet sync: not run yet. It runs with your daily COGS refresh.</p>;
+    return <p className="sub2" style={{ margin: '-8px 0 14px' }}>COGS sheet sync: not run yet. It runs every hour once the Google sync script is set up (see README).</p>;
   }
   const stale = Date.now() - last.createdAt.getTime() > 36 * 36e5;
   return (
