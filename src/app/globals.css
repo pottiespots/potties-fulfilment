@@ -387,3 +387,7 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .top .tabs{gap:0}
 .top .tab{padding-inline:7px}
 @media (max-width:1440px){.me-name{display:none}}
+.act-err{max-width:340px;font-size:12px;line-height:1.35}
+.ok-text{color:var(--ok);font-size:12px;max-width:340px}
+.top .act-err,.top .ok-text{position:absolute;top:100%;right:16px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:30}
+.top{position:sticky}

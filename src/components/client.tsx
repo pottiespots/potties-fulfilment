@@ -68,7 +68,8 @@ export function ActButton({ action, children, className = 'btn', confirm }: { ac
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
       <button type="button" className={className} disabled={pending} onClick={() => (confirm ? setAsking(true) : go())}>{pending ? 'Saving…' : children}</button>
-      {r?.error && <span className="err-text" role="alert">{r.error}</span>}
+      {r?.error && <span className="err-text act-err" role="alert">{r.error}</span>}
+      {r?.ok && <span className="ok-text" role="status">{r.ok}</span>}
     </span>
   );
 }

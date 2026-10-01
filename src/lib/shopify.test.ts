@@ -41,3 +41,15 @@ describe('Shopify app login (client credentials)', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('Shopify error messages', async () => {
+  const { explainShopifyError } = await import('./shopify');
+  it('names the missing permission', () => {
+    const msg = explainShopifyError(200, { errors: [{ message: 'Access denied for customer field. Required access: `read_customers` access scope.', extensions: { code: 'ACCESS_DENIED', requiredAccess: '`read_customers` access scope.' } }] });
+    expect(msg).toContain('read_customers');
+    expect(msg).not.toContain('{');
+  });
+  it('explains a bad login', () => {
+    expect(explainShopifyError(401, {})).toContain('client ID');
+  });
+});

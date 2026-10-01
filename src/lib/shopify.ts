@@ -44,7 +44,7 @@ export async function gql<T>(query: string, variables: Record<string, unknown> =
   });
   if (res.status === 401) cached = null;
   const json = await res.json();
-  if (!res.ok || json.errors) throw new Error(`Shopify error: ${JSON.stringify(json.errors ?? json).slice(0, 300)}`);
+  if (!res.ok || json.errors) throw new Error(explainShopifyError(res.status, json));
   return json.data as T;
 }
 
@@ -60,18 +60,16 @@ export function verifyWebhook(rawBody: string, hmacHeader: string | null): boole
 }
 
 const ORDER_FIELDS = `
-  id name createdAt cancelledAt email phone note
+  id name createdAt cancelledAt note
   displayFinancialStatus displayFulfillmentStatus
-  customer { firstName lastName }
   shippingAddress { name firstName lastName company address1 address2 city province zip country phone }
   shippingLine { title }
   lineItems(first: 50) { nodes { id title variantTitle sku quantity requiresShipping customAttributes { key value } } }
 `;
 
 type ShopifyOrder = {
-  id: string; name: string; createdAt: string; cancelledAt: string | null; email: string | null; phone: string | null; note: string | null;
+  id: string; name: string; createdAt: string; cancelledAt: string | null; note: string | null;
   displayFinancialStatus: string | null; displayFulfillmentStatus: string;
-  customer: { firstName: string | null; lastName: string | null } | null;
   shippingAddress: { name: string | null; company: string | null; address1: string | null; address2: string | null; city: string | null; province: string | null; zip: string | null; country: string | null; phone: string | null } | null;
   shippingLine: { title: string } | null;
   lineItems: { nodes: { id: string; title: string; variantTitle: string | null; sku: string | null; quantity: number; requiresShipping: boolean; customAttributes: { key: string; value: string }[] }[] };
@@ -95,8 +93,9 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
 
   const a = o.shippingAddress;
   const addr = {
-    customerName: a?.name || [o.customer?.firstName, o.customer?.lastName].filter(Boolean).join(' ') || 'Customer',
-    email: o.email, phone: a?.phone || o.phone,
+    // Everything comes from the shipping address, so the app needs no access to Shopify customer accounts.
+    customerName: a?.name || 'Customer',
+    phone: a?.phone ?? null,
     address1: [a?.company, a?.address1].filter(Boolean).join(', ') || null, address2: a?.address2 ?? null,
     city: a?.city ?? null, province: a?.province ?? null, zip: a?.zip ?? null, country: a?.country ?? null,
     deliveryNote: o.note,
@@ -172,4 +171,20 @@ export async function pushTracking(shopifyOrderId: string, company: string, numb
 export function adminUrl(shopifyId: string | null) {
   if (!shopifyId || !domain()) return null;
   return `https://${domain()}/admin/orders/${shopifyId.split('/').pop()}`;
+}
+
+/** Turns Shopify's technical errors into something HQ can act on. */
+export function explainShopifyError(status: number, json: { errors?: unknown }): string {
+  const errs = Array.isArray(json.errors) ? (json.errors as { message?: string; extensions?: { code?: string; requiredAccess?: string } }[]) : [];
+  const denied = errs.find((e) => e.extensions?.code === 'ACCESS_DENIED');
+  if (denied) {
+    const scope = denied.extensions?.requiredAccess?.match(/`([a-z_]+)`/)?.[1];
+    if (/protected customer data|not approved to access/i.test(denied.message ?? ''))
+      return 'Shopify is blocking customer names and addresses. In the Dev Dashboard, open the app → API access → Protected customer data, and request access to name, address and phone.';
+    return scope ? `Shopify needs one more permission: add “${scope}” to the app in the Dev Dashboard, release a new version, then try again.` : `Shopify refused: ${denied.message}`;
+  }
+  if (status === 401 || status === 403) return 'Shopify refused the app’s login. Check the client ID and secret, and that the app is installed on the store.';
+  if (status === 404) return 'Shopify store not found. Check SHOPIFY_STORE_DOMAIN (it should end in .myshopify.com).';
+  const first = errs[0]?.message ?? (typeof json.errors === 'string' ? json.errors : JSON.stringify(json).slice(0, 200));
+  return `Shopify error: ${first}`;
 }
