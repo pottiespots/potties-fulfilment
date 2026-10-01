@@ -16,6 +16,8 @@ var CONFIG = {
   SHEET_ID: '1AgicuQxJGSGoaz607Jg9tVDpaMHWilQ0_s8AAyE3KMA',
   INVOICES_FOLDER_ID: '1OmBqYbH_pouVy2dajRBhvPeAQK5W6-1R',
   PURCHASE_ORDERS_FOLDER_ID: '1CG8K1w2rSKJB7I5BIOD7C6k6WrWrHl4r',
+  // Other folders holding supplier invoices (RB Foundry). Anything not found here is searched for across Drive.
+  EXTRA_INVOICE_FOLDER_IDS: ['1HtidXw6xy7MPMXidNk4aNwPgoF2Y78wn'],
   INVOICES_TAB: '8. Invoices',
   FULFILMENT_TAB: '15. Fulfilment',
   TZ: 'Africa/Johannesburg',
@@ -143,10 +145,7 @@ function pushInvoices() {
     if (outstanding <= 0.01) paidAt = ymd(lastPaid || new Date());
 
     var order = ('Order # (1:1 match)' in col) ? String(row[col['Order # (1:1 match)']] || '').trim() : '';
-    var driveUrl = null;
-    for (var f = 0; f < pdfs.length; f++) {
-      if (pdfs[f].name.toUpperCase().indexOf(ref.toUpperCase()) >= 0) { driveUrl = pdfs[f].url; break; }
-    }
+    var driveUrl = findInvoicePdf(ref, pdfs);
     var paidAmount = num(row[col['Deposit PAID']]) + num(row[col['Balance PAID']]);
     var noteParts = [type, String(row[col['Status']] || '')];
     if ('Linked orders' in col && row[col['Linked orders']]) noteParts.push(String(row[col['Linked orders']]));
@@ -173,19 +172,61 @@ function pushInvoices() {
 
 function driveIndex() {
   var out = [];
-  var ids = [CONFIG.INVOICES_FOLDER_ID, CONFIG.PURCHASE_ORDERS_FOLDER_ID];
+  var ids = [CONFIG.INVOICES_FOLDER_ID, CONFIG.PURCHASE_ORDERS_FOLDER_ID].concat(CONFIG.EXTRA_INVOICE_FOLDER_IDS || []);
   for (var i = 0; i < ids.length; i++) {
     try {
-      var it = DriveApp.getFolderById(ids[i]).getFiles();
-      while (it.hasNext()) {
-        var file = it.next();
-        out.push({ name: file.getName(), url: file.getUrl() });
-      }
+      collectFiles(DriveApp.getFolderById(ids[i]), out, 0);
     } catch (e) {
       console.warn('folder ' + ids[i] + ': ' + e.message);
     }
   }
   return out;
+}
+
+/** Files in a folder and its subfolders (2 levels deep). */
+function collectFiles(folder, out, depth) {
+  var it = folder.getFiles();
+  while (it.hasNext()) {
+    var file = it.next();
+    out.push({ name: file.getName(), url: file.getUrl(), mime: file.getMimeType() });
+  }
+  if (depth >= 2) return;
+  var sub = folder.getFolders();
+  while (sub.hasNext()) collectFiles(sub.next(), out, depth + 1);
+}
+
+/** Scores a file as the invoice document for `ref`: the invoice itself beats a picked order, never a proof of payment. */
+function invoiceScore(name, ref) {
+  var n = name.toUpperCase();
+  if (n.indexOf(ref.toUpperCase()) < 0) return -1;
+  if (/^POP|PROOF OF PAYMENT|NOTICE OF PAYMENT|STATEMENT|ARCHIVE/.test(n)) return -1;
+  var score = 1;
+  if (/INVOICE/.test(n)) score += 2;
+  if (/\.PDF$/.test(n)) score += 1;
+  return score;
+}
+
+/** Drive link of the invoice PDF: first in the known folders, then anywhere in Drive. */
+function findInvoicePdf(ref, index) {
+  var best = null, bestScore = 0, i, sc;
+  for (i = 0; i < index.length; i++) {
+    sc = invoiceScore(index[i].name, ref);
+    if (sc > bestScore) { best = index[i].url; bestScore = sc; }
+  }
+  if (best) return best;
+  try {
+    var q = "title contains '" + ref.replace(/'/g, "\\'") + "' and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
+    var it = DriveApp.searchFiles(q);
+    var n = 0;
+    while (it.hasNext() && n < 20) {
+      var f = it.next(); n++;
+      sc = invoiceScore(f.getName(), ref);
+      if (sc > bestScore) { best = f.getUrl(); bestScore = sc; }
+    }
+  } catch (e) {
+    console.warn('drive search ' + ref + ': ' + e.message);
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------- 2. orders -> "15. Fulfilment"
