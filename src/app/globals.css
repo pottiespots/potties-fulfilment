@@ -361,6 +361,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .flash{border-radius:8px;padding:10px 12px;font-size:14px}
 .flash.err{background:var(--bad-bg);color:var(--bad)}
 .flash.ok{background:var(--ok-bg);color:var(--ok)}
+.flash.warn{background:var(--warn-bg);color:var(--warn)}
 .inline{display:inline}
 form.inline{display:inline-flex}
 .login{min-height:100%;display:grid;place-items:center;padding:24px 16px}

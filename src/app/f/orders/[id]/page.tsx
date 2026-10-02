@@ -38,6 +38,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         <section className="sec">
           <h4>Ship to <CopyButton text={addressText(o)} /></h4>
           <ShipTo o={o} now={now} />
+          {o.addressEditedAt && !['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(o.stage) && <div className="flash warn" style={{ marginTop: 10 }}>Potties HQ changed this address on {dayTime(o.addressEditedAt)}. Use this address and the latest packing slip, not an older printout.</div>}
         </section>
 
         {o.stage === 'SENT' && (

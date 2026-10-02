@@ -46,6 +46,9 @@ export const orders = pgTable('orders', {
   zip: text('zip'),
   country: text('country'),
   deliveryNote: text('delivery_note'),
+  // Set when HQ corrects the shipping address; Shopify syncs then leave the address alone.
+  addressEditedAt: ts('address_edited_at'),
+  addressEditedBy: text('address_edited_by'),
   courier: text('courier'),
   courierService: text('courier_service'),
   shipBy: ts('ship_by').notNull(),

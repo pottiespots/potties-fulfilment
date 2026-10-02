@@ -226,7 +226,8 @@ export async function getPackingSlipTemplate(): Promise<{ template: string; cust
 export async function renderShopifyPackingSlip(o: OrderDetail): Promise<string> {
   const [{ template }, shop] = await Promise.all([getPackingSlipTemplate(), getShopInfo()]);
   const sd = o.shopifyData ?? {};
-  const shipping = liquidAddress(sd.shippingAddress, o.customerName) ?? liquidAddress({
+  // HQ's corrected address wins over the one Shopify has.
+  const shipping = (o.addressEditedAt ? null : liquidAddress(sd.shippingAddress, o.customerName)) ?? liquidAddress({
     name: o.customerName, address1: o.address1, address2: o.address2, city: o.city, province: o.province, zip: o.zip, country: o.country, phone: o.phone,
   });
   const lines = o.lines.map((l) => ({

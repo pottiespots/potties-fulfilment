@@ -94,15 +94,7 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
   // Only paid orders that still need shipping enter the pipeline.
   if (!existing && (!paid || o.displayFulfillmentStatus === 'FULFILLED')) return 'skipped';
 
-  const a = o.shippingAddress;
-  const addr = {
-    // Everything comes from the shipping address, so the app needs no access to Shopify customer accounts.
-    customerName: a?.name || 'Customer',
-    phone: a?.phone ?? null,
-    address1: [a?.company, a?.address1].filter(Boolean).join(', ') || null, address2: a?.address2 ?? null,
-    city: a?.city ?? null, province: a?.province ?? null, zip: a?.zip ?? null, country: a?.country ?? null,
-    deliveryNote: o.note,
-  };
+  const addr = addressFromShopify(o.shippingAddress, o.note);
 
   const shopifyData: ShopifyOrderData = {
     billingAddress: o.billingAddress ?? null, shippingAddress: o.shippingAddress ?? null,
@@ -111,7 +103,8 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
 
   if (existing) {
     // Address/notes can change in Shopify until the foundry has packed the order.
-    const editable = ['NEW', 'SENT', 'ACCEPTED', 'MANUFACTURING', 'PACKING'].includes(existing.stage);
+    // An address HQ corrected by hand is kept.
+    const editable = ['NEW', 'SENT', 'ACCEPTED', 'MANUFACTURING', 'PACKING'].includes(existing.stage) && !existing.addressEditedAt;
     await db.update(schema.orders).set({ ...(editable ? addr : {}), shopifyData, updatedAt: new Date() }).where(eq(schema.orders.id, existing.id));
     // Fill in product images for orders synced before images were stored.
     for (const l of o.lineItems.nodes) {
@@ -141,6 +134,17 @@ export async function upsertShopifyOrder(o: ShopifyOrder): Promise<'created' | '
   }
   await logEvent({ orderId: row.id, actor: 'Shopify', text: 'Order paid and synced from Shopify' });
   return 'created';
+}
+
+/** Order address columns from a Shopify shipping address. Everything comes from the shipping address, so the app needs no access to Shopify customer accounts. */
+export function addressFromShopify(a: ShopifyAddress | null | undefined, note: string | null) {
+  return {
+    customerName: a?.name || 'Customer',
+    phone: a?.phone ?? null,
+    address1: [a?.company, a?.address1].filter(Boolean).join(', ') || null, address2: a?.address2 ?? null,
+    city: a?.city ?? null, province: a?.province ?? null, zip: a?.zip ?? null, country: a?.country ?? null,
+    deliveryNote: note,
+  };
 }
 
 export async function fetchOrder(gid: string) {

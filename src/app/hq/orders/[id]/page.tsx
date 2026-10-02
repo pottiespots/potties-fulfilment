@@ -8,7 +8,7 @@ import { KIND_LABEL, PHOTO_SLOTS, COURIERS } from '@/lib/labels';
 import { adminUrl } from '@/lib/shopify';
 import { uploadOrderFile, addNote, addTracking } from '@/app/actions/orders';
 import {
-  sendToFoundry, chaseFoundry, approveProof, requestRetake, answerQuestion, changeShipBy, hqSetStage, markDelivered, createInvoice, markInvoicePaid, uploadPop,
+  sendToFoundry, chaseFoundry, approveProof, requestRetake, answerQuestion, changeShipBy, editAddress, resetAddress, hqSetStage, markDelivered, createInvoice, markInvoicePaid, uploadPop,
 } from '@/app/actions/hq';
 import { ShipTo, Stepper, Timeline, addressText, Pill } from '@/components/ui';
 import { ActButton, ActForm, CopyButton, NoteBox, Submit, UploadSlot } from '@/components/client';
@@ -116,6 +116,33 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
               <div className="btns"><input name="shipBy" type="datetime-local" defaultValue={toLocalInput(o.shipBy)} className="search" style={{ width: 'auto' }} aria-label="New ship-by date" /><Submit className="btn ghost sm">Change date</Submit></div>
             </ActForm>
           ) : null} />
+          {o.addressEditedAt && (
+            <div className="btns" style={{ marginTop: 10, alignItems: 'center' }}>
+              <Pill tone="warn">Address changed by {o.addressEditedBy ?? 'HQ'} on {dayTime(o.addressEditedAt)}. Shopify updates won’t overwrite it.</Pill>
+              {isOpen(o.stage) && o.shopifyData?.shippingAddress && <ActButton action={resetAddress.bind(null, o.id)} className="btn ghost sm">Use Shopify address again</ActButton>}
+            </div>
+          )}
+          {isOpen(o.stage) && (
+            <details className="more" style={{ marginTop: 12 }}>
+              <summary>Change shipping address</summary>
+              <ActForm action={editAddress.bind(null, o.id)}>
+                <div className="grid2" style={{ marginTop: 10 }}>
+                  <label className="field">Name on parcel<input name="customerName" defaultValue={o.customerName} required /></label>
+                  <label className="field">Phone for the courier<input name="phone" defaultValue={o.phone ?? ''} /></label>
+                  <label className="field">Street address (company, street)<input name="address1" defaultValue={o.address1 ?? ''} required /></label>
+                  <label className="field">Suburb, unit or building<input name="address2" defaultValue={o.address2 ?? ''} /></label>
+                  <label className="field">Town / city<input name="city" defaultValue={o.city ?? ''} required /></label>
+                  <label className="field">Postal code<input name="zip" defaultValue={o.zip ?? ''} /></label>
+                  <label className="field">Province<input name="province" defaultValue={o.province ?? ''} /></label>
+                  <label className="field">Country<input name="country" defaultValue={o.country ?? 'South Africa'} required /></label>
+                </div>
+                <label className="field" style={{ marginTop: 10 }}>Delivery note (shown to the foundry and courier)<textarea name="deliveryNote" rows={2} defaultValue={o.deliveryNote ?? ''} /></label>
+                <label className="field" style={{ marginTop: 10 }}>Why it changed (optional, sent to the foundry)<input name="note" placeholder="e.g. Customer asked to deliver to their office" /></label>
+                <p className="sub2" style={{ margin: '8px 0' }}>The packing slip updates straight away{o.stage !== 'NEW' ? ' and the foundry is told about the new address' : ''}. This changes the address in the Order Desk only, not in Shopify.</p>
+                <div className="btns"><Submit>Save new address</Submit></div>
+              </ActForm>
+            </details>
+          )}
         </section>
 
         <div className="two">

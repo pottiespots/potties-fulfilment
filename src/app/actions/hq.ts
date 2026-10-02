@@ -11,7 +11,7 @@ import { STAGE_LABEL, STAGES } from '@/lib/rules';
 import { dayTime, fromLocalInput } from '@/lib/format';
 import { notifyFoundry, sendEmail } from '@/lib/notify';
 import { checkUpload, putFile, storageKey } from '@/lib/storage';
-import { syncRecentOrders, shopifyConfigured } from '@/lib/shopify';
+import { syncRecentOrders, shopifyConfigured, addressFromShopify } from '@/lib/shopify';
 import type { Res } from './orders';
 
 async function requireHQ(): Promise<User> {
@@ -85,6 +85,50 @@ export async function changeShipBy(orderId: string, _p: Res, fd: FormData): Prom
   await touch(orderId, { shipBy: d });
   await logEvent({ orderId, userId: u.id, actor: actorLabel(u), text: `Ship-by date changed to ${dayTime(d)}` });
   return done('Ship-by date updated');
+}
+
+const ADDRESS_FIELDS = ['customerName', 'address1', 'address2', 'city', 'zip', 'province', 'country', 'phone', 'deliveryNote'] as const;
+type AddressFields = Record<(typeof ADDRESS_FIELDS)[number], string | null>;
+const oneLine = (a: AddressFields) => [a.customerName, a.address1, a.address2, [a.city, a.zip].filter(Boolean).join(' '), a.province, a.country, a.phone ? `Tel ${a.phone}` : null]
+  .filter(Boolean).join(', ');
+
+/** Saves a new shipping address, drops the old packing slip PDF (the Drive sync makes a new one) and tells the foundry. */
+async function applyAddress(u: User, orderId: string, next: AddressFields, edited: boolean, note: string): Promise<Res> {
+  const o = await getOrder(orderId, 'HQ');
+  if (!o) return { error: 'Order not found.' };
+  if (['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(o.stage)) return { error: 'This order has already left. Change the address with the courier.' };
+  const before = oneLine(o);
+  const after = oneLine(next);
+  if (before === after && (o.deliveryNote ?? null) === next.deliveryNote) return { error: 'Nothing changed.' };
+  await touch(orderId, {
+    ...next, customerName: next.customerName || 'Customer', addressEditedAt: edited ? new Date() : null, addressEditedBy: edited ? u.name : null,
+    // The foundry must put the new slip in the box.
+    ...(o.slipInBox ? { slipInBox: false } : {}),
+  });
+  await db.delete(schema.orderFiles).where(and(eq(schema.orderFiles.orderId, orderId), eq(schema.orderFiles.kind, 'PACKING_SLIP')));
+  await logEvent({ orderId, userId: u.id, actor: actorLabel(u), kind: 'note',
+    text: `${edited ? 'Shipping address changed' : 'Shipping address reset to Shopify'}. Ship to: ${after}${next.deliveryNote ? `. Delivery note: ${next.deliveryNote}` : ''}${note ? `. ${note}` : ''} (was: ${before})` });
+  if (o.stage !== 'NEW') {
+    await notifyFoundry(`New shipping address for ${o.name}`,
+      `Potties HQ changed where ${o.name} must go.\n\nShip to: ${after}${next.deliveryNote ? `\nDelivery note: ${next.deliveryNote}` : ''}${note ? `\n\n${note}` : ''}\n\nPlease print the new packing slip and use this address on the waybill.`,
+      `/f/orders/${orderId}`);
+  }
+  return done(edited ? 'Address updated. The packing slip now shows the new address.' : 'Address reset to the Shopify address.');
+}
+
+export async function editAddress(orderId: string, _p: Res, fd: FormData): Promise<Res> {
+  const u = await requireHQ();
+  const v = (k: string) => String(fd.get(k) ?? '').trim().slice(0, 300) || null;
+  const next = Object.fromEntries(ADDRESS_FIELDS.map((k) => [k, v(k)])) as AddressFields;
+  if (!next.customerName || !next.address1 || !next.city || !next.country) return { error: 'Name, street address, town and country are needed.' };
+  return applyAddress(u, orderId, next, true, v('note') ?? '');
+}
+
+export async function resetAddress(orderId: string): Promise<Res> {
+  const u = await requireHQ();
+  const o = await getOrder(orderId, 'HQ');
+  if (!o?.shopifyData?.shippingAddress) return { error: 'No Shopify address stored for this order. Press Sync Shopify first.' };
+  return applyAddress(u, orderId, addressFromShopify(o.shopifyData.shippingAddress, o.shopifyData.note ?? null), false, '');
 }
 
 /** Manual correction: HQ can put an order in any stage (logged). */
