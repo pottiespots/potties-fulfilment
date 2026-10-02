@@ -8,6 +8,15 @@ export type AttentionKind =
   | 'send' | 'question' | 'not-accepted' | 'late' | 'proof' | 'custom-unchecked' | 'tracking-failed'
   | 'invoice-overdue' | 'invoice-due' | 'pop-missing' | 'po-late' | 'low-stock';
 
+export type AttentionGroup = 'orders' | 'invoices' | 'stock';
+
+/** Which Today tab each kind of item belongs to. */
+export const ATTENTION_GROUP: Record<AttentionKind, AttentionGroup> = {
+  send: 'orders', question: 'orders', 'not-accepted': 'orders', late: 'orders', proof: 'orders', 'custom-unchecked': 'orders', 'tracking-failed': 'orders',
+  'invoice-overdue': 'invoices', 'invoice-due': 'invoices', 'pop-missing': 'invoices',
+  'po-late': 'stock', 'low-stock': 'stock',
+};
+
 export type Attention = {
   sev: 'bad' | 'hot' | 'warn' | 'mute';
   kind: AttentionKind;
@@ -20,6 +29,7 @@ export type Attention = {
   invoiceId?: string;
   poId?: string;
   productId?: string;
+  sortAt?: Date;          // tie-break within the same severity (ship-by or due date)
 };
 
 export function buildAttention(input: {
@@ -30,7 +40,7 @@ export function buildAttention(input: {
   const A: Attention[] = [];
   const left = (d: Date) => d.getTime() - now.getTime();
   for (const o of orders) {
-    const base = { ref: o.name, orderId: o.id };
+    const base = { ref: o.name, orderId: o.id, sortAt: o.shipBy };
     if (o.stage === 'NEW') A.push({ ...base, sev: 'hot', kind: 'send', title: 'New order: check and send to foundry', detail: `${o.customerName} · ${o.lines.map((l) => l.title).join(', ')} · ships ${day(o.shipBy)}` });
     if (o.openQuestion) A.push({ ...base, sev: 'hot', kind: 'question', title: 'Foundry has a question', detail: `“${o.openQuestion}”` });
     if (o.stage === 'SENT' && o.sentAt && acceptDeadline(o.sentAt, acceptHours) < now) A.push({ ...base, sev: 'bad', kind: 'not-accepted', title: `Not accepted after ${acceptHours} h`, detail: o.customerName });
@@ -43,20 +53,21 @@ export function buildAttention(input: {
     if (o.shopifySyncError && o.stage === 'SHIPPED' && !o.shopifyFulfillmentId) A.push({ ...base, sev: 'bad', kind: 'tracking-failed', title: 'Tracking did not reach Shopify', detail: o.shopifySyncError });
   }
   for (const i of invoices) {
-    const base = { ref: i.number, invoiceId: i.id, supplier: i.supplier, supplierLabel: i.supplierLabel, orderId: i.orderId ?? undefined };
-    const who = `${i.supplier === 'FOUNDRY' ? 'Foundry' : i.supplier === 'LL' ? 'LL' : i.supplierLabel || 'Supplier'} invoice`;
-    if (!i.paidAt && i.dueAt < now) A.push({ ...base, sev: 'bad', kind: 'invoice-overdue', title: `${who} ${i.number} overdue · ${money(i.amountCents)}`, detail: `Was due ${duration(left(i.dueAt))} ago` });
-    else if (!i.paidAt) A.push({ ...base, sev: 'mute', kind: 'invoice-due', title: `${who} ${i.number} unpaid · ${money(i.amountCents)}`, detail: `Due in ${duration(left(i.dueAt))}` });
-    else if (!i.pop) A.push({ ...base, sev: 'mute', kind: 'pop-missing', title: `Proof of payment missing for ${i.number}`, detail: 'Upload the POP for the audit trail' });
+    const base = { ref: i.number, invoiceId: i.id, sortAt: i.dueAt, supplier: i.supplier, supplierLabel: i.supplierLabel, orderId: i.orderId ?? undefined };
+    // The supplier tag and invoice number are shown beside the title, so the title only says what's wrong.
+    if (!i.paidAt && i.dueAt < now) A.push({ ...base, sev: 'bad', kind: 'invoice-overdue', title: `Overdue · ${money(i.amountCents)}`, detail: `Was due ${duration(left(i.dueAt))} ago` });
+    else if (!i.paidAt) A.push({ ...base, sev: 'mute', kind: 'invoice-due', title: `Unpaid · ${money(i.amountCents)}`, detail: `Due ${day(i.dueAt)} (in ${duration(left(i.dueAt))})` });
+    else if (!i.pop) A.push({ ...base, sortAt: undefined, sev: 'mute', kind: 'pop-missing', title: 'Paid · proof of payment missing', detail: 'Upload the POP for the audit trail' });
   }
   for (const p of pos) {
     if (p.status !== 'DELIVERED' && p.status !== 'CANCELLED' && p.expectedAt && p.expectedAt < now)
-      A.push({ sev: 'warn', kind: 'po-late', ref: p.number, poId: p.id, supplier: 'LL', title: 'LL delivery is late', detail: p.lines.map((l) => `${l.quantity} × ${l.product.name}`).join(', ') });
+      A.push({ sev: 'warn', kind: 'po-late', ref: p.number, poId: p.id, supplier: 'LL', title: 'Delivery from LL is late', detail: p.lines.map((l) => `${l.quantity} × ${l.product.name}`).join(', ') });
   }
   for (const x of llProducts) {
     if (x.active && x.available + x.onOrder < x.reorderLevel)
-      A.push({ sev: 'warn', kind: 'low-stock', ref: x.sku, productId: x.id, supplier: 'LL', title: `Low stock: ${x.name}`, detail: `${x.available} available · reorder level ${x.reorderLevel}` });
+      A.push({ sev: 'warn', kind: 'low-stock', ref: x.sku, productId: x.id, supplier: 'LL', title: `Low stock · ${x.name}`, detail: `${x.available} available · reorder level ${x.reorderLevel}` });
   }
   const rank = { bad: 0, hot: 1, warn: 2, mute: 3 };
-  return A.sort((a, b) => rank[a.sev] - rank[b.sev]);
+    const at = (a: Attention) => a.sortAt?.getTime() ?? Number.MAX_SAFE_INTEGER; // undated items last
+  return A.sort((a, b) => rank[a.sev] - rank[b.sev] || at(a) - at(b));
 }

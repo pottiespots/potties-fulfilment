@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAttention } from './attention';
+import { buildAttention, ATTENTION_GROUP } from './attention';
 import type { OrderRow } from './data';
 
 const now = new Date('2026-10-01T08:00:00Z');
@@ -21,5 +21,14 @@ describe('attention list', () => {
   it('asks HQ to approve proof once photos are in', () => {
     const A = buildAttention({ orders: [order({ stage: 'PACKED', shipBy: new Date('2026-10-02T08:00:00Z'), fileKinds: ['PHOTO_PRODUCT', 'PHOTO_PACKED'] })], invoices: [], pos: [], llProducts: [], now, acceptHours: 24 });
     expect(A.map((a) => a.kind)).toContain('proof');
+  });
+});
+
+describe('attention groups', () => {
+  it('puts unpaid invoices under Invoices, soonest due first', () => {
+    const inv = (id: string, due: string) => ({ id, number: id, supplier: 'FOUNDRY', supplierLabel: null, orderId: null, amountCents: 100, dueAt: new Date(due), paidAt: null, pop: null });
+    const A = buildAttention({ orders: [], invoices: [inv('B', '2026-10-20'), inv('A', '2026-10-05')] as never, pos: [], llProducts: [], now, acceptHours: 24 });
+    expect(A.map((a) => a.ref)).toEqual(['A', 'B']);
+    expect(A.every((a) => ATTENTION_GROUP[a.kind] === 'invoices')).toBe(true);
   });
 });

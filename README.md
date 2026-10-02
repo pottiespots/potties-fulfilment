@@ -126,7 +126,7 @@ Shopify doesn't let other apps download its packing slip PDF. So the dashboard b
 
 ## Day to day
 
-- **Potties HQ** starts on **Today**. It lists everything that needs you (new orders to send, foundry questions, late orders, proof to approve, invoices due, low stock), each with a button to act.
+- **Potties HQ** starts on **Today**. It lists everything that needs you, each with a button to act. Use the tabs to see only **Orders** (new orders to send, foundry questions, late orders, proof to approve), only **Invoices** (overdue and unpaid invoices, missing proofs of payment, next payments) or only **LL & stock** (late LL deliveries, low stock).
 - **The foundry** starts on **My orders**, sorted by ship-by date. They tap an order to accept it, change its status, upload photos, download the packing slip and add tracking. The **Deadlines** tab shows a two-week timeline.
 - **Changing a shipping address**: on the order, open **Change shipping address**, fix it and save. The packing slip shows the new address straight away, and the Drive copy is remade on the next hourly sync. If the order is already with the foundry, they get an email and a warning on the order to use the new slip. Shopify syncs then leave your address alone; **Use Shopify address again** undoes it. This changes the Order Desk only, not the address in Shopify.
 - **Invoices**: attach the foundry’s Xero invoice on the order screen and LL’s invoice on its purchase order. Then mark it paid and upload the proof of payment. The **Invoices** tab shows what’s still owed to each supplier.

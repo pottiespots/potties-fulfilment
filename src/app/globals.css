@@ -400,3 +400,9 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .sk-num{height:26px;width:60px;margin-bottom:8px}
 .sk-line{height:12px;width:80%}
 .sk-row{height:78px;border-radius:var(--r)}
+.ttabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
+.ttabs .chip{display:inline-flex;gap:6px;align-items:center;padding:7px 14px;font-size:14px;font-weight:600}
+.tcount{font-variant-numeric:tabular-nums;opacity:.7}
+.tbad{background:var(--bad-bg);color:var(--bad);border-radius:999px;padding:0 7px;font-size:11px;font-weight:700}
+.tgroup{margin-bottom:18px}
+.tmore{margin-left:auto;text-transform:none;letter-spacing:0;font-size:13px}
