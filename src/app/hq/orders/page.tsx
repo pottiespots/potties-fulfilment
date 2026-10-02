@@ -2,9 +2,10 @@ import Link from 'next/link';
 import { requireRole } from '@/lib/auth';
 import { listOrders, hasCustom, itemsSummary, type OrderRow } from '@/lib/data';
 import { STAGES, STAGE_LABEL, STAGE_SHORT, stageIndex, urgency } from '@/lib/rules';
+import { ORDER_SORTS, isSortKey, sortOrders, type OrderSortKey, type SortDir } from '@/lib/order-sort';
 import { day } from '@/lib/format';
 import { LeftPill, Pill } from '@/components/ui';
-import { FilterBox } from '@/components/client';
+import { FilterBox, LinkSelect } from '@/components/client';
 import type { Stage } from '@/lib/db/schema';
 
 export const metadata = { title: 'Foundry orders · Potties' };
@@ -32,7 +33,9 @@ function invPill(o: OrderRow) {
 export default async function Orders({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireRole('HQ');
   const sp = await searchParams;
-  const f = sp.f ?? 'all', view = sp.view === 'board' ? 'board' : 'list', sort = sp.sort ?? 'shipBy';
+  const f = sp.f ?? 'all', view = sp.view === 'board' ? 'board' : 'list';
+  const sort: OrderSortKey = isSortKey(sp.sort) ? sp.sort : 'shipBy';
+  const dir: SortDir = sp.dir === 'asc' || sp.dir === 'desc' ? sp.dir : ORDER_SORTS[sort].dir;
   const stage = STAGES.includes(sp.stage as Stage) ? (sp.stage as Stage) : null;
   const now = new Date();
   let rows = await listOrders('HQ');
@@ -42,14 +45,29 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
   if (f === 'custom') rows = rows.filter(hasCustom);
   if (f === 'unpaid') rows = rows.filter((o) => o.invoice && !o.invoice.paidAt);
   if (f === 'proof') rows = rows.filter((o) => o.stage === 'PACKED' && !o.proofApprovedAt);
-  if (sort === 'stage') rows.sort((a, b) => stageIndex(a.stage) - stageIndex(b.stage));
-  if (sort === 'placed') rows.sort((a, b) => b.placedAt.getTime() - a.placedAt.getTime());
+  sortOrders(rows, sort, dir, now);
   const q = (p: Record<string, string | null>) => {
     const u = new URLSearchParams();
-    const merged = { f, view, sort, stage, ...p };
+    const merged: Record<string, string | null> = { f, view, sort, dir, stage, ...p };
+    if (merged.dir === ORDER_SORTS[merged.sort as OrderSortKey].dir) merged.dir = null; // default direction stays out of the link
     for (const [k, v] of Object.entries(merged)) if (v && !(k === 'f' && v === 'all') && !(k === 'view' && v === 'list') && !(k === 'sort' && v === 'shipBy')) u.set(k, v);
     return `/hq/orders${u.size ? `?${u}` : ''}`;
   };
+  // Clicking a column heading sorts by it; clicking it again flips the direction.
+  const Th = ({ k, children }: { k: OrderSortKey; children: React.ReactNode }) => {
+    const on = sort === k;
+    const next: SortDir = on ? (dir === 'asc' ? 'desc' : 'asc') : ORDER_SORTS[k].dir;
+    const s = ORDER_SORTS[k];
+    return (
+      <th aria-sort={on ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+        <Link className={`sorth${on ? ' on' : ''}`} href={q({ sort: k, dir: next })} title={`Sort by ${s.label.toLowerCase()}: ${next === 'asc' ? s.asc : s.desc}`}>
+          {children}<span className="arrow" aria-hidden>{on ? (dir === 'asc' ? '↑' : '↓') : '↕'}</span>
+        </Link>
+      </th>
+    );
+  };
+  const sortOptions = (Object.keys(ORDER_SORTS) as OrderSortKey[]).flatMap((k) => (ORDER_SORTS[k].dir === 'asc' ? ['asc', 'desc'] as const : ['desc', 'asc'] as const)
+    .map((d) => ({ value: `${k}:${d}`, label: `${ORDER_SORTS[k].label}: ${ORDER_SORTS[k][d]}`, href: q({ sort: k, dir: d }) })));
   return (
     <main className="page" id="orders">
       <div className="toolbar">
@@ -63,16 +81,15 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
       <div className="toolbar">
         {FILTERS.map(([k, l]) => <Link key={k} className="chip" aria-current={f === k ? 'page' : undefined} href={q({ f: k })} style={{ textDecoration: 'none' }}>{l}</Link>)}
         <div className="spacer" />
+        <LinkSelect label="Sort by" value={`${sort}:${dir}`} options={sortOptions} />
         <FilterBox target="#orders" placeholder="Search order #, customer, town" />
       </div>
       {view === 'list' ? (
         <div className="tbl-wrap">
           <table className="otbl">
             <thead><tr>
-              <th><Link className="lnk" href={q({ sort: 'placed' })}>Order{sort === 'placed' ? ' ↓' : ''}</Link></th><th>Ship to</th>
-              <th><Link className="lnk" href={q({ sort: 'shipBy' })}>Ship by{sort === 'shipBy' ? ' ↓' : ''}</Link></th>
-              <th><Link className="lnk" href={q({ sort: 'stage' })}>Stage{sort === 'stage' ? ' ↓' : ''}</Link></th>
-              <th>Custom</th><th>Proof</th><th>Tracking</th><th>Invoice</th>
+              <Th k="order">Order</Th><Th k="town">Ship to</Th><Th k="shipBy">Ship by</Th><Th k="stage">Stage</Th>
+              <Th k="custom">Custom</Th><Th k="proof">Proof</Th><Th k="tracking">Tracking</Th><Th k="invoice">Invoice</Th>
             </tr></thead>
             <tbody>
               {rows.map((o) => {

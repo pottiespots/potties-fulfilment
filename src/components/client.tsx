@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 type Res = { ok?: string; error?: string } | null;
 type FormAction = (prev: Res, fd: FormData) => Promise<Res>;
@@ -194,5 +194,19 @@ export function FilterBox({ target, placeholder }: { target: string; placeholder
         const q = e.target.value.toLowerCase();
         document.querySelectorAll<HTMLElement>(`${target} [data-search]`).forEach((el) => { el.hidden = !!q && !el.dataset.search!.toLowerCase().includes(q); });
       }} />
+  );
+}
+
+/** Dropdown that opens a link: used for "Sort by" lists. */
+export function LinkSelect({ label, value, options }: { label: string; value: string; options: { value: string; label: string; href: string }[] }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <label className="sortsel" aria-busy={pending || undefined}>
+      <span>{label}</span>
+      <select value={value} onChange={(e) => { const o = options.find((x) => x.value === e.target.value); if (o) start(() => router.push(o.href)); }}>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </label>
   );
 }
