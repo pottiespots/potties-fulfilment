@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { foundryChecklist, foundryComplete, type ChecklistInput } from './checklist';
+import { foundryChecklist, foundryComplete, hqChecklist, type ChecklistInput } from './checklist';
 
 const base: ChecklistInput = { stage: 'ACCEPTED', hasCustom: true, foundryCustomChecked: false, slipInBox: false, photoKinds: [], proofApprovedAt: null, acceptedAt: new Date(), packedAt: null, shippedAt: null, trackingNumber: null };
 
@@ -17,5 +17,14 @@ describe('foundry checklist', () => {
     expect(s.every((x) => x.done)).toBe(true);
     expect(foundryComplete({ stage: 'SHIPPED' })).toBe(true);
     expect(foundryComplete({ stage: 'PACKED' })).toBe(false);
+  });
+});
+
+describe('HQ checklist', () => {
+  it('adds HQ steps around the foundry steps', () => {
+    const s = hqChecklist({ ...base, hasCustom: false, sentAt: new Date(), deliveredAt: null });
+    expect(s.map((x) => x.key)).toEqual(['send', 'accept', 'make', 'photo-product', 'packing', 'slip', 'photo-packed', 'packed', 'approve', 'tracking', 'delivered']);
+    expect(s.filter((x) => x.who === 'HQ').map((x) => x.key)).toEqual(['send', 'approve', 'delivered']);
+    expect(s[0].done).toBe(true);
   });
 });

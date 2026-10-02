@@ -163,37 +163,43 @@ export function Tile({ v, l, s, tone = '', href, active }: { v: React.ReactNode;
 }
 
 /** The foundry's to-do list for an order, shown beside the order on wide screens and at the top on phones. */
-export function Checklist({ steps, complete, shippedAt, shipBy, now }: { steps: Step[]; complete: boolean; shippedAt: Date | null; shipBy: Date; now: Date }) {
+export function Checklist({ steps, complete, shippedAt, shipBy, now, title = 'To do', doneTitle = 'Order complete', doneNote, finalLabel = 'Order complete', finalPending = 'Happens as soon as the courier has collected', finalDone = 'Left the foundry', showWho = false }: {
+  steps: Step[]; complete: boolean; shippedAt: Date | null; shipBy: Date; now: Date;
+  title?: string; doneTitle?: string; doneNote?: string; finalLabel?: string; finalPending?: string; finalDone?: string; showWho?: boolean;
+}) {
   const done = steps.filter((s) => s.done).length;
-  const next = steps.find((s) => !s.done);
+  // The next step follows the furthest point reached; earlier steps left undone are shown as missed.
+  const lastDone = steps.reduce((m, s, i) => (s.done ? i : m), -1);
+  const next = steps.find((s, i) => !s.done && i > lastDone);
   const pct = complete ? 100 : Math.round((done / steps.length) * 100);
   return (
     <details className={`todo ${complete ? 'complete' : ''}`} open>
       <summary>
-        <span className="todo-t">{complete ? 'Order complete' : 'To do'}</span>
-        <span className="todo-c num">{complete ? 'Left the foundry' : `${done} of ${steps.length} done`}</span>
+        <span className="todo-t">{complete ? doneTitle : title}</span>
+        <span className="todo-c num">{complete ? finalDone : `${done} of ${steps.length} done`}</span>
         <span className="todo-bar" aria-hidden><i style={{ width: `${pct}%` }} /></span>
         {!complete && next && <span className="todo-next">Next: <b>{next.label}</b> · ship by {day(shipBy)} {time(shipBy)}</span>}
       </summary>
-      {complete && <div className="todo-done">✓ This order has left the foundry{shippedAt ? ` (${day(shippedAt)})` : ''}. Nothing more to do. Thank you!</div>}
+      {complete && <div className="todo-done">✓ {doneNote ?? `This order has left the foundry${shippedAt ? ` (${day(shippedAt)})` : ''}. Nothing more to do. Thank you!`}</div>}
       <ol className="todo-list">
-        {steps.map((s) => {
+        {steps.map((s, i) => {
           const isNext = !complete && s === next;
+          const missed = !s.done && i < lastDone;
           return (
-            <li key={s.key} className={s.done ? 'done' : isNext ? 'next' : ''}>
+            <li key={s.key} className={s.done ? 'done' : isNext ? 'next' : missed ? 'missed' : ''}>
               <a href={s.href}>
                 <span className="dot" aria-hidden>{s.done ? '✓' : ''}</span>
-                <span className="txt"><b>{s.label}</b><small>{s.done ? (s.at ? `Done ${day(s.at)} ${time(s.at)}` : 'Done') : complete ? 'Not recorded' : isNext ? s.hint : 'To do'}</small></span>
+                <span className="txt"><b>{s.label}{showWho && s.who && <span className={`who who-${s.who.toLowerCase()}`}>{s.who}</span>}</b><small>{s.done ? (s.at ? `Done ${day(s.at)} ${time(s.at)}` : 'Done') : missed ? (complete ? 'Not recorded' : 'Missed: can still be done') : isNext ? s.hint : 'To do'}</small></span>
                 {isNext && <span className="now">Do this next</span>}
               </a>
             </li>
           );
         })}
         <li className={complete ? 'done final' : 'final'}>
-          <span className="row"><span className="dot" aria-hidden>{complete ? '✓' : ''}</span><span className="txt"><b>Order complete</b><small>{complete ? 'Left the foundry' : 'Happens as soon as the courier has collected'}</small></span></span>
+          <span className="row"><span className="dot" aria-hidden>{complete ? '✓' : ''}</span><span className="txt"><b>{finalLabel}</b><small>{complete ? finalDone : finalPending}</small></span></span>
         </li>
       </ol>
-      {!complete && now > shipBy && <div className="todo-late">Past the ship-by date. Please finish the next step or add a note about the delay.</div>}
+      {!complete && now > shipBy && !steps.find((s) => s.key === 'tracking')?.done && <div className="todo-late">Past the ship-by date. Please finish the next step or add a note about the delay.</div>}
     </details>
   );
 }

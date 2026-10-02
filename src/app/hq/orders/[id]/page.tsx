@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireRole } from '@/lib/auth';
-import { getOrder } from '@/lib/data';
+import { getOrder, gateInput } from '@/lib/data';
 import { STAGES, STAGE_LABEL, isOpen, money } from '@/lib/rules';
 import { dayTime, toLocalInput } from '@/lib/format';
 import { KIND_LABEL, PHOTO_SLOTS, COURIERS } from '@/lib/labels';
@@ -10,7 +10,8 @@ import { uploadOrderFile, addNote, addTracking } from '@/app/actions/orders';
 import {
   sendToFoundry, chaseFoundry, approveProof, requestRetake, answerQuestion, changeShipBy, editAddress, resetAddress, hqSetStage, markDelivered, createInvoice, markInvoicePaid, uploadPop,
 } from '@/app/actions/hq';
-import { ShipTo, Stepper, Timeline, addressText, Pill } from '@/components/ui';
+import { ShipTo, Stepper, Timeline, addressText, Pill, Checklist } from '@/components/ui';
+import { hqChecklist } from '@/lib/checklist';
 import { ActButton, ActForm, CopyButton, NoteBox, Submit, UploadSlot } from '@/components/client';
 import { FileThumbs } from '@/components/files';
 
@@ -26,6 +27,8 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
   const shopify = adminUrl(o.shopifyId);
   const invFile = o.invoice ? o.files.find((f) => f.invoiceId === o.invoice!.id && f.kind === 'INVOICE') : null;
 
+  const steps = hqChecklist({ ...gateInput(o), acceptedAt: o.acceptedAt, packedAt: o.packedAt, shippedAt: o.shippedAt, trackingNumber: o.trackingNumber, sentAt: o.sentAt, deliveredAt: o.deliveredAt });
+  const leftFoundry = o.stage === 'SHIPPED' || o.stage === 'DELIVERED';
   let next: React.ReactNode = null;
   if (o.stage === 'NEW') {
     next = (
@@ -95,7 +98,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <main className="page narrow">
+    <main className="page fpage">
       <Link href="/hq/orders" className="back">← Foundry orders</Link>
       <div className="ohead">
         <div><h1>{o.name} · {o.customerName}</h1><div className="sub">Placed {dayTime(o.placedAt)}{o.email ? ` · ${o.email}` : ''}</div></div>
@@ -103,11 +106,20 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
       </div>
       <Stepper stage={o.stage} />
 
-      <div className="stack">
+      <div className="fgrid">
+      <aside className="fside">
+        {o.stage !== 'CANCELLED' && (
+          <Checklist steps={steps} complete={o.stage === 'DELIVERED'} shippedAt={o.shippedAt} shipBy={o.shipBy} now={now} showWho
+            title={leftFoundry ? 'Left the foundry · in transit' : 'Order progress'} doneTitle="Order fulfilled"
+            doneNote={`Delivered${o.deliveredAt ? ` ${dayTime(o.deliveredAt)}` : ''}. Order fulfilled.`}
+            finalLabel="Order fulfilled" finalPending={leftFoundry ? 'Waiting for delivery' : 'After the foundry ships and the customer receives it'} finalDone="Delivered" />
+        )}
+      </aside>
+      <div className="stack fmain">
         {o.shopifySyncError && o.stage === 'SHIPPED' && !o.shopifyFulfillmentId && (
           <div className="flash err">Tracking did not reach Shopify: {o.shopifySyncError}. Add the tracking in Shopify by hand, then mark delivered here.</div>
         )}
-        {next}
+        <div id="next">{next}</div>
 
         <section className="sec">
           <h4>Ship to <CopyButton text={addressText(o)} /></h4>
@@ -146,7 +158,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
         </section>
 
         <div className="two">
-          <section className="sec">
+          <section className="sec" id="items">
             <h4>Items & customisation</h4>
             <div className="makebox">
               {o.lines.map((l) => (
@@ -179,7 +191,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
           </section>
         </div>
 
-        <section className="sec">
+        <section className="sec" id="proof">
           <h4>Proof from foundry {o.proofApprovedAt ? <Pill tone="ok">Approved</Pill> : photosReady ? <Pill tone="warn">Review</Pill> : <Pill>Waiting</Pill>}</h4>
           <div className="photos">
             {PHOTO_SLOTS.filter((k) => k !== 'PHOTO_CUSTOM' || custom.length).map((k) => {
@@ -190,7 +202,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
           <FileThumbs files={o.files.filter((f) => f.kind.startsWith('PHOTO_') || f.kind === 'OTHER')} />
         </section>
 
-        <section className="sec">
+        <section className="sec" id="tracking">
           <h4>Tracking</h4>
           {o.trackingNumber ? (
             <div className="sent-ok">{o.trackingCompany} · <span className="mono">{o.trackingNumber}</span> · {o.shopifyFulfillmentId ? 'sent to Shopify, customer notified' : 'saved here only'}</div>
@@ -255,6 +267,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
             <p className="sub2">Only for fixing mistakes. The change is recorded in the history.</p>
           </ActForm>
         </details>
+      </div>
       </div>
     </main>
   );

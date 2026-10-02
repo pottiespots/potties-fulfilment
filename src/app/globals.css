@@ -475,3 +475,9 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .todo-list .now{flex:none;font-size:11px;font-weight:700;color:var(--on-accent);background:var(--ember);border-radius:999px;padding:2px 8px;margin-top:2px}
 .todo-list li.final .txt b{font-weight:800}
 :root.dark .todo-list li.done .dot{color:#1b1916}
+.todo-list .who{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 5px;vertical-align:1px}
+.todo-list .who-hq{background:var(--info-bg);color:var(--info)}
+.todo-list .who-foundry{background:var(--ember-soft);color:var(--ember-deep)}
+:root.dark .todo-list .who-foundry{color:var(--ember)}
+.todo-list li.missed .dot{border-color:var(--warn);border-style:dashed}
+.todo-list li.missed .txt small{color:var(--warn);font-weight:600}

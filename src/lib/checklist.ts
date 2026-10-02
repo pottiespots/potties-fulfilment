@@ -5,7 +5,7 @@ import type { GateInput } from './rules';
 export type ChecklistInput = GateInput & {
   acceptedAt: Date | null; packedAt: Date | null; shippedAt: Date | null; trackingNumber: string | null;
 };
-export type Step = { key: string; label: string; hint: string; done: boolean; at: Date | null; href: string };
+export type Step = { key: string; label: string; hint: string; done: boolean; at: Date | null; href: string; who?: 'HQ' | 'Foundry' };
 
 export function foundryChecklist(o: ChecklistInput): Step[] {
   const past = (s: Parameters<typeof stageIndex>[0]) => stageIndex(o.stage) >= stageIndex(s);
@@ -27,3 +27,17 @@ export function foundryChecklist(o: ChecklistInput): Step[] {
 
 /** Done once the parcel has left the foundry. */
 export const foundryComplete = (o: Pick<ChecklistInput, 'stage'>) => o.stage === 'SHIPPED' || o.stage === 'DELIVERED';
+
+/** HQ's view: the foundry's steps plus HQ's own (send, approve proof) through to delivery. */
+export function hqChecklist(o: ChecklistInput & { sentAt: Date | null; deliveredAt: Date | null }): Step[] {
+  const past = (s: Parameters<typeof stageIndex>[0]) => stageIndex(o.stage) >= stageIndex(s);
+  const href: Record<string, string> = { '#status': '#next', '#make': '#items', '#proof': '#proof', '#tracking': '#tracking' };
+  const foundry = foundryChecklist(o).map((s): Step => ({ ...s, href: href[s.href] ?? s.href, who: 'Foundry' }));
+  const at = foundry.findIndex((s) => s.key === 'tracking');
+  foundry.splice(at, 0, { key: 'approve', label: 'Approve the proof photos', hint: 'Check the photos, then approve', done: !!o.proofApprovedAt, at: o.proofApprovedAt, href: '#proof', who: 'HQ' });
+  return [
+    { key: 'send', label: 'Check and send to foundry', hint: 'Confirm the customisation and address', done: past('SENT'), at: o.sentAt, href: '#next', who: 'HQ' },
+    ...foundry,
+    { key: 'delivered', label: 'Delivered to the customer', hint: 'Shopify reports it, or press Mark delivered', done: o.stage === 'DELIVERED', at: o.deliveredAt, href: '#next', who: 'HQ' },
+  ];
+}
