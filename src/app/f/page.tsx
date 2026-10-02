@@ -31,7 +31,13 @@ function Job({ o, now }: { o: OrderRow; now: Date }) {
   );
 }
 
-export default async function MyOrders() {
+type Show = 'new' | 'late' | 'soon' | 'tracking';
+const SHOWS: Show[] = ['new', 'late', 'soon', 'tracking'];
+
+export default async function MyOrders({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const sp = await searchParams;
+  const show = SHOWS.find((x) => x === sp.show) ?? null;
+  const tileHref = (x: Show) => (show === x ? '/f' : `/f?show=${x}`); // click again to see everything
   const user = await requireRole('FOUNDRY');
   const now = new Date();
   const all = await listOrders('FOUNDRY');
@@ -40,6 +46,7 @@ export default async function MyOrders() {
   const late = open.filter((o) => urgency(o.stage, o.shipBy, now) === 'late');
   const soon = open.filter((o) => urgency(o.stage, o.shipBy, now) === 'soon');
   const later = open.filter((o) => urgency(o.stage, o.shipBy, now) === 'ok');
+  const tracking = open.filter((o) => o.stage === 'PACKED');
   const shipped = all.filter((o) => o.stage === 'SHIPPED' || o.stage === 'DELIVERED').reverse().slice(0, 15);
   const group = (title: string, list: OrderRow[], empty: string, cls = '') => (
     <div className={`group ${cls}`}>
@@ -54,16 +61,23 @@ export default async function MyOrders() {
         <div className="btns"><FilterBox target="#mine" placeholder="Search order # or name" /><Link className="btn ghost" href="/f/deadlines">See deadlines</Link></div>
       </div>
       <div className="ftiles">
-        <Tile tone="hot" v={ask.length} l="New orders to accept" s="Within 24 h of receiving" />
-        <Tile tone="bad" v={late.length} l="Late" s="Past the ship-by date" />
-        <Tile tone="warn" v={soon.length} l="Ship in next 3 days" s="Keep these moving" />
-        <Tile v={open.filter((o) => o.stage === 'PACKED').length} l="Waiting for tracking" s="Packed, add waybill when collected" />
+        <Tile tone="hot" v={ask.length} l="New orders to accept" s="Within 24 h of receiving" href={tileHref('new')} active={show === 'new'} />
+        <Tile tone="bad" v={late.length} l="Late" s="Past the ship-by date" href={tileHref('late')} active={show === 'late'} />
+        <Tile tone="warn" v={soon.length} l="Ship in next 3 days" s="Keep these moving" href={tileHref('soon')} active={show === 'soon'} />
+        <Tile v={tracking.length} l="Waiting for tracking" s="Packed, add waybill when collected" href={tileHref('tracking')} active={show === 'tracking'} />
       </div>
-      {group('New orders: please accept', ask, 'No new orders waiting. We email you when one arrives.', 'g-hot')}
-      {late.length > 0 && group('Late', late, '', 'g-bad')}
-      {group('Ship in the next 3 days', soon, 'Nothing due in the next 3 days.')}
-      {group('Coming up', later, 'Nothing further out yet.')}
-      {group('Shipped', shipped, 'Nothing shipped yet.')}
+      {show && <div className="showing">Showing only: <b>{{ new: 'New orders to accept', late: 'Late', soon: 'Ship in next 3 days', tracking: 'Waiting for tracking' }[show]}</b> <Link className="btn ghost sm" href="/f" scroll={false}>Show all orders</Link></div>}
+      {show === 'new' && group('New orders: please accept', ask, 'No new orders waiting. We email you when one arrives.', 'g-hot')}
+      {show === 'late' && group('Late', late, 'Nothing is late. Well done!', 'g-bad')}
+      {show === 'soon' && group('Ship in the next 3 days', soon, 'Nothing due in the next 3 days.')}
+      {show === 'tracking' && group('Waiting for tracking', tracking, 'No packed orders waiting for tracking.')}
+      {!show && <>
+        {group('New orders: please accept', ask, 'No new orders waiting. We email you when one arrives.', 'g-hot')}
+        {late.length > 0 && group('Late', late, '', 'g-bad')}
+        {group('Ship in the next 3 days', soon, 'Nothing due in the next 3 days.')}
+        {group('Coming up', later, 'Nothing further out yet.')}
+        {group('Shipped', shipped, 'Nothing shipped yet.')}
+      </>}
     </main>
   );
 }

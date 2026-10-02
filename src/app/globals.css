@@ -436,3 +436,8 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .hb-track i{display:block;height:100%;background:var(--chart,#d9691e);border-radius:4px}
 .slinks{display:flex;flex-wrap:wrap;gap:6px}
 .skel-box{display:flex;align-items:center;justify-content:center}
+.ftile.link{text-decoration:none;color:inherit;cursor:pointer;position:relative;transition:transform .08s ease,border-color .08s ease}
+.ftile.link:hover{border-color:var(--ember);transform:translateY(-1px)}
+.ftile.link .go{font-size:12px;font-weight:700;color:var(--ember);margin-top:6px}
+.ftile.link[aria-current]{border:2px solid var(--fg)}
+.showing{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-8px 0 14px;font-size:14px}

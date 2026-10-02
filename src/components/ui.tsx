@@ -155,6 +155,8 @@ export function PickupAgenda({ rows, now, hrefBase, label }: { rows: Order[]; no
   );
 }
 
-export function Tile({ v, l, s, tone = '' }: { v: React.ReactNode; l: string; s?: string; tone?: '' | 'hot' | 'bad' | 'warn' }) {
-  return <div className={`ftile ${tone}`}><span className="v num">{v}</span><span className="l">{l}</span>{s && <span className="s">{s}</span>}</div>;
+export function Tile({ v, l, s, tone = '', href, active }: { v: React.ReactNode; l: string; s?: string; tone?: '' | 'hot' | 'bad' | 'warn'; href?: string; active?: boolean }) {
+  const body = <><span className="v num">{v}</span><span className="l">{l}</span>{s && <span className="s">{s}</span>}</>;
+  if (!href) return <div className={`ftile ${tone}`}>{body}</div>;
+  return <Link href={href} scroll={false} className={`ftile link ${tone}`} aria-current={active ? 'true' : undefined}>{body}<span className="go" aria-hidden>{active ? 'Showing ✓' : 'Show →'}</span></Link>;
 }
