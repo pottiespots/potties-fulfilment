@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db, schema } from '@/lib/db';
 import { checkIntegrationToken } from '@/lib/integration';
 
-// POST /api/integration/report — the routine records how its run went; shown on Today and Connections.
+// POST /api/integration/report — the routine records how its run went; shown on the Dashboard and Connections.
 const Body = z.object({ source: z.string().min(1).max(60).default('cogs-routine'), ok: z.boolean(), summary: z.string().min(1).max(2000) });
 
 export async function POST(req: Request) {

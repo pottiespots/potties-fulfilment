@@ -66,6 +66,7 @@ Since January 2026, Shopify makes new private apps in the **Dev Dashboard**. The
    - `read_orders`
    - `read_merchant_managed_fulfillment_orders`, `write_merchant_managed_fulfillment_orders`
    - `read_fulfillments`, `write_fulfillments`
+   - Optional: `read_reports`, so the dashboard can show site visits and conversion rate. Shopify also asks for access to protected customer data for this.
 
    Then **release** the version.
 3. **Install** the app on your store (Home → Install app).
@@ -108,7 +109,7 @@ Every hour the script:
 2. Writes a **15. Fulfilment** tab into the sheet, with each order's stage, ship-by date, courier and tracking number.
 3. Saves each order's Shopify packing slip as **Packing slip #order.pdf** into **Drive › Potties › Fulfilment › #order**, along with proof photos and proofs of payment. The PDF is also attached to the order on the dashboard (**Download PDF**).
 4. Saves Gmail attachments that mention an order number (waybills, artwork) into that folder and links them to the order.
-5. Logs the run (`POST /api/integration/report`). The result shows on **Today**, **Invoices** and **Logins → Check connections**.
+5. Logs the run (`POST /api/integration/report`). The result shows on the **Dashboard**, **Invoices** and **Logins → Check connections**.
 
 **Setup (once):**
 1. Go to script.google.com and click **New project**. Sign in with the Google account that owns the COGS sheet.
@@ -126,7 +127,13 @@ Shopify doesn't let other apps download its packing slip PDF. So the dashboard b
 
 ## Day to day
 
-- **Potties HQ** starts on **Today**. It lists everything that needs you, each with a button to act. Use the tabs to see only **Orders** (new orders to send, foundry questions, late orders, proof to approve), only **Invoices** (overdue and unpaid invoices, missing proofs of payment, next payments) or only **LL & stock** (late LL deliveries, low stock).
+- **Potties HQ** starts on the **Dashboard**. Its top row shows the money picture for the last 30 days, all compared with the 30 days before:
+  - Shopify sales and cash received
+  - what was paid to suppliers, and the net cash flow
+  - what customers still owe (EFT and pending payments) and what is still owed to suppliers
+
+  The **Sales & cash** tab adds sales per day, cash in by payment method, sales channels, best sellers and site visits. You can switch between 7 days, 30 days and this month, and the **Shopify ↗** buttons open the matching page in Shopify admin. Sales figures come from Shopify orders and refresh every 15 minutes. Shopify only shares the last 60 days of orders with apps.
+- Below that, the Dashboard lists everything that needs you, each with a button to act. Use the tabs to see only **Orders** (new orders to send, foundry questions, late orders, proof to approve), only **Invoices** (overdue and unpaid invoices, missing proofs of payment, next payments) or only **LL & stock** (late LL deliveries, low stock).
 - **The foundry** starts on **My orders**, sorted by ship-by date. They tap an order to accept it, change its status, upload photos, download the packing slip and add tracking. The **Deadlines** tab shows a two-week timeline.
 - **Changing a shipping address**: on the order, open **Change shipping address**, fix it and save. The packing slip shows the new address straight away, and the Drive copy is remade on the next hourly sync. If the order is already with the foundry, they get an email and a warning on the order to use the new slip. Shopify syncs then leave your address alone; **Use Shopify address again** undoes it. This changes the Order Desk only, not the address in Shopify.
 - **Invoices**: attach the foundry’s Xero invoice on the order screen and LL’s invoice on its purchase order. Then mark it paid and upload the proof of payment. The **Invoices** tab shows what’s still owed to each supplier.

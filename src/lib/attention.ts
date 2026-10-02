@@ -10,7 +10,7 @@ export type AttentionKind =
 
 export type AttentionGroup = 'orders' | 'invoices' | 'stock';
 
-/** Which Today tab each kind of item belongs to. */
+/** Which Dashboard tab each kind of item belongs to. */
 export const ATTENTION_GROUP: Record<AttentionKind, AttentionGroup> = {
   send: 'orders', question: 'orders', 'not-accepted': 'orders', late: 'orders', proof: 'orders', 'custom-unchecked': 'orders', 'tracking-failed': 'orders',
   'invoice-overdue': 'invoices', 'invoice-due': 'invoices', 'pop-missing': 'invoices',

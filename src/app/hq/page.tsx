@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { requireRole } from '@/lib/auth';
 import { listOrders, invoicesWithPop, purchaseOrdersFull, productsWithStock } from '@/lib/data';
 import { buildAttention, ATTENTION_GROUP, type Attention, type AttentionGroup } from '@/lib/attention';
@@ -9,8 +10,11 @@ import { ActButton } from '@/components/client';
 import { approveProof, chaseFoundry, markInvoicePaid } from '@/app/actions/hq';
 import { supplierName } from '@/lib/labels';
 import { SyncStatus } from '@/components/sync-status';
+import { MoneyStrip, MoneySkeleton, RangeChips, SalesDetail, TrafficPanel } from '@/components/money';
+import { isRange, type InsightRange } from '@/lib/insights-calc';
+import { shopifyAdmin } from '@/lib/shopify-insights';
 
-export const metadata = { title: 'Today · Potties' };
+export const metadata = { title: 'Dashboard · Potties' };
 
 function Actions({ a }: { a: Attention }) {
   const open = a.orderId ? `/hq/orders/${a.orderId}` : '';
@@ -28,11 +32,23 @@ function Actions({ a }: { a: Attention }) {
   }
 }
 
-const VIEWS: { key: 'all' | AttentionGroup; label: string }[] = [
-  { key: 'all', label: 'Everything' }, { key: 'orders', label: 'Orders' }, { key: 'invoices', label: 'Invoices' }, { key: 'stock', label: 'LL & stock' },
+type View = 'all' | AttentionGroup | 'money';
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'all', label: 'Everything' }, { key: 'money', label: 'Sales & cash' }, { key: 'orders', label: 'Orders' }, { key: 'invoices', label: 'Invoices' }, { key: 'stock', label: 'LL & stock' },
 ];
 const GROUP_TITLE: Record<AttentionGroup, string> = { orders: 'Orders', invoices: 'Supplier invoices', stock: 'LL Manufacturing & stock' };
 const PREVIEW = 5;
+
+function ShopifyLinks() {
+  const links: [string, string][] = [['', 'Shopify home'], ['/orders', 'Orders'], ['/analytics', 'Analytics'], ['/analytics/reports', 'Reports'], ['/payments/payouts', 'Payouts'], ['/products', 'Products'], ['/customers', 'Customers'], ['/discounts', 'Discounts']];
+  if (!shopifyAdmin()) return null;
+  return (
+    <div className="sec">
+      <h4>Open in Shopify</h4>
+      <div className="slinks">{links.map(([p, l]) => <a key={p} className="btn ghost sm" href={shopifyAdmin(p)!} target="_blank" rel="noreferrer">{l} ↗</a>)}</div>
+    </div>
+  );
+}
 
 function Inbox({ items }: { items: Attention[] }) {
   return (
@@ -52,10 +68,11 @@ function Inbox({ items }: { items: Attention[] }) {
   );
 }
 
-export default async function Today({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireRole('HQ');
   const sp = await searchParams;
-  const view = (VIEWS.find((v) => v.key === sp.view)?.key ?? 'all') as 'all' | AttentionGroup;
+  const view: View = VIEWS.find((v) => v.key === sp.view)?.key ?? 'all';
+  const range: InsightRange = isRange(sp.range) ? sp.range : '30';
   const now = new Date();
   const [orders, invoices, pos, ll] = await Promise.all([listOrders('HQ'), invoicesWithPop(), purchaseOrdersFull(), productsWithStock('LL')]);
   const A = buildAttention({ orders, invoices, pos, llProducts: ll, now, acceptHours: Number(process.env.ACCEPT_WINDOW_HOURS || 24) });
@@ -78,19 +95,51 @@ export default async function Today({ searchParams }: { searchParams: Promise<Re
   const onTime = shippedThisMonth.length ? Math.round((shippedThisMonth.filter((o) => o.shippedAt! <= o.shipBy).length / shippedThisMonth.length) * 100) : null;
   return (
     <main className="page">
-      <div className="hello"><div><h2>Today at Potties</h2><p>{longDate(now)} · {A.length} things need you · {money(owedF + owedL)} still to pay suppliers</p></div></div>
+      <div className="hello"><div><h2>Potties dashboard</h2><p>{longDate(now)} · {A.length} things need you · {money(owedF + owedL)} still to pay suppliers</p></div></div>
       <SyncStatus />
       <nav className="ttabs" aria-label="Show">
         {VIEWS.map((v) => {
-          const items = v.key === 'all' ? A : byGroup[v.key];
-          const bad = urgent(items);
+          const items = v.key === 'money' ? null : v.key === 'all' ? A : byGroup[v.key];
+          const bad = items ? urgent(items) : 0;
           return (
             <Link key={v.key} href={v.key === 'all' ? '/hq' : `/hq?view=${v.key}`} className="chip" aria-current={view === v.key ? 'page' : undefined}>
-              {v.label} <span className="tcount">{items.length}</span>{bad > 0 && <span className="tbad" title="Urgent">{bad} urgent</span>}
+              {v.label}{items && <span className="tcount">{items.length}</span>}{bad > 0 && <span className="tbad" title="Urgent">{bad} urgent</span>}
             </Link>
           );
         })}
       </nav>
+      {view === 'all' && (
+        <Suspense fallback={<MoneySkeleton />}>
+          <MoneyStrip range="30" invoices={invoices} owedCents={owedF + owedL} detailHref="/hq?view=money" />
+        </Suspense>
+      )}
+      {view === 'money' && (
+        <>
+          <RangeChips range={range} base="/hq?view=money" />
+          <Suspense key={`strip-${range}`} fallback={<MoneySkeleton />}>
+            <MoneyStrip range={range} invoices={invoices} owedCents={owedF + owedL} />
+          </Suspense>
+          <div className="todaygrid">
+            <div className="stack">
+              <Suspense key={`detail-${range}`} fallback={<MoneySkeleton tall />}><SalesDetail range={range} /></Suspense>
+            </div>
+            <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+              <Suspense key={`traffic-${range}`} fallback={<MoneySkeleton />}><TrafficPanel range={range} /></Suspense>
+              <div className="sec">
+                <h4>Money going out</h4>
+                <div className="grid2">
+                  <div className="kv"><span>Owed to foundry</span><b className="num" style={{ fontSize: 20 }}>{money(owedF)}</b></div>
+                  <div className="kv"><span>Owed to LL & others</span><b className="num" style={{ fontSize: 20 }}>{money(owedL)}</b></div>
+                  <div className="kv"><span>Overdue</span><b className="num" style={{ fontSize: 20, color: overdue.length ? 'var(--bad)' : undefined }}>{money(sum(overdue))}</b></div>
+                  <div className="kv"><span>Due next 7 days</span><b className="num" style={{ fontSize: 20 }}>{money(sum(dueSoon))}</b></div>
+                </div>
+                <Link className="lnk" href="/hq?view=invoices" style={{ display: 'inline-block', marginTop: 8 }}>Invoices to pay →</Link>
+              </div>
+              <ShopifyLinks />
+            </div>
+          </div>
+        </>
+      )}
       {(view === 'all' || view === 'orders') && <div className="pipe">
         {STAGES.map((s, i) => (
           <Link key={s} href={`/hq/orders?stage=${s}`} className="pstage" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -99,7 +148,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<Re
           </Link>
         ))}
       </div>}
-      <div className="todaygrid">
+      {view !== 'money' && <div className="todaygrid">
         <div>
           {view === 'all' ? (
             A.length ? (['orders', 'invoices', 'stock'] as AttentionGroup[]).filter((g) => byGroup[g].length).map((g) => (
@@ -173,7 +222,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<Re
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </main>
   );
 }

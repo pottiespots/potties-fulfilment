@@ -277,6 +277,7 @@ th .lnk{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spaci
   --r:12px; color-scheme:light;
 }
 :root.dark{
+  --chart:#dc7330;
   --bg:#1b1916; --surface:#24221e; --fg:#f2eadf; --line:#3a352e; --muted:#b6ac9b; --faint:#857c6e; --iron-2:#e5d9c6;
   --ember:#e9853f; --ember-deep:#f09a59; --ember-soft:#3d2c1f; --ok:#8cc47f; --ok-bg:#223120; --warn:#e3b04d; --warn-bg:#352b17; --bad:#f08a80; --bad-bg:#3a201e; --info:#8fbfdc; --info-bg:#1d2b34;
   --shadow:none; color-scheme:dark;
@@ -413,3 +414,25 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .sortsel{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);font-weight:600}
 .sortsel select{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 8px;font-size:13px;max-width:280px}
 .sortsel[aria-busy]{opacity:.6}
+.moneystrip{margin-bottom:14px}
+.ms-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.m-kpi .v{font-family:var(--body);font-weight:700;font-size:24px;letter-spacing:-.01em}
+.m-kpi .d{margin-top:4px;min-height:16px}
+.kpi.ok .v{color:var(--fg)}
+.delta{font-size:12px;color:var(--muted);font-weight:600}
+.delta.up{color:var(--ok)} .delta.down{color:var(--bad)}
+.delta .vs{color:var(--faint);font-weight:500}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart .mark{fill:var(--chart,#d9691e)}
+.chart .hit{fill:transparent}
+.chart .bar:hover .mark{fill:var(--ember-deep)}
+.chart .bar:hover .hit{fill:color-mix(in srgb,var(--fg) 5%,transparent)}
+.chart .base{stroke:var(--line);stroke-width:1}
+.chart .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+.chart .axis{fill:var(--muted);font-size:11px}
+.hbars{display:grid;gap:10px}
+.hb-t{display:flex;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:4px}
+.hb-track{height:8px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:4px;overflow:hidden}
+.hb-track i{display:block;height:100%;background:var(--chart,#d9691e);border-radius:4px}
+.slinks{display:flex;flex-wrap:wrap;gap:6px}
+.skel-box{display:flex;align-items:center;justify-content:center}
