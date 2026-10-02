@@ -144,6 +144,10 @@ Shopify doesn't let other apps download its packing slip PDF. So the dashboard b
 - Users can’t reset their own password yet. HQ sets new passwords on the **Logins** page.
 - Deliveries are marked delivered automatically when Shopify receives courier tracking updates. Not every South African courier reports deliveries to Shopify, so HQ can also press **Mark delivered**.
 
+## Updating the live app (saving Netlify credits)
+
+Every push to `main` is a Netlify production deploy, and the free plan allows about 20 a month. Work happens on the **`dev`** branch, which Netlify doesn't build. When a batch of changes is ready and tested, `dev` is merged into `main` once and that single push goes live. See `CLAUDE.md`.
+
 ## Which version is live?
 
 Every page shows **Version abc1234 · updated …** at the bottom, and so does `/api/health`. The number matches the latest commit on GitHub. If it doesn't, the newest update hasn't been deployed: check **Netlify → Deploys**.
