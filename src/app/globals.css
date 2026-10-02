@@ -500,3 +500,12 @@ footer.ver{text-align:center;font-size:11px;color:var(--faint);padding:10px 16px
 .cfbar.out{background:var(--muted)}
 ul.notes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:6px}
 .todaygrid>*{min-width:0}
+.paysteps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.paysteps .ps{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg)}
+.paysteps .ps b{display:block;font-size:14px}
+.paysteps .ps small{font-size:12px;color:var(--muted)}
+.paysteps .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff;background:var(--surface)}
+.paysteps .ps.done .dot{background:var(--ok);border-color:var(--ok)}
+.paysteps .ps.part .dot{border-color:var(--info);border-style:dashed}
+:root.dark .paysteps .ps.done .dot{color:#1b1916}
+.otbl .r{text-align:right}

@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireRole } from '@/lib/auth';
 import { getOrder, gateInput } from '@/lib/data';
-import { FOUNDRY_LABEL, FOUNDRY_SETTABLE, canAddTracking, packedBlockers, money } from '@/lib/rules';
-import { dayTime } from '@/lib/format';
+import { FOUNDRY_LABEL, FOUNDRY_SETTABLE, canAddTracking, packedBlockers, money, invoiceStatus } from '@/lib/rules';
+import { dayTime, day } from '@/lib/format';
 import { KIND_LABEL, PHOTO_SLOTS, COURIERS, NOTE_PRESETS } from '@/lib/labels';
 import { acceptOrder, askQuestion, setFoundryStage, setCheck, uploadOrderFile, addNote, addTracking, deleteOrderFile } from '@/app/actions/orders';
 import { ShipTo, Timeline, addressText, Pill, Checklist } from '@/components/ui';
@@ -149,9 +149,28 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
           <Timeline events={o.events} />
         </section>
 
-        <div style={{ padding: '0 4px', fontSize: 13, color: 'var(--muted)' }}>
-          Your invoice: {o.invoice ? <>{o.invoice.number} · {money(o.invoice.amountCents)} · {o.invoice.paidAt ? <Pill tone="ok">Paid</Pill> : <Pill tone="warn">Awaiting payment</Pill>}</> : 'not received yet'}
-        </div>
+        <section className="sec" id="invoice">
+          <h4>Your invoice & payment {o.invoice ? <Pill tone={invoiceStatus(o.invoice, now).tone}>{invoiceStatus(o.invoice, now).label}</Pill> : <Pill>Not received yet</Pill>}</h4>
+          {o.invoice ? (() => {
+            const inv = o.invoice!;
+            const invFile = o.files.find((f) => f.kind === 'INVOICE' && f.invoiceId === inv.id);
+            const pop = [...o.files].reverse().find((f) => f.kind === 'POP' && f.invoiceId === inv.id);
+            return (
+              <>
+                <div className="paysteps">
+                  <div className="ps done"><span className="dot">✓</span><div><b>Invoice received</b><small>{inv.number} · {money(inv.amountCents)} · {day(inv.createdAt)}</small></div></div>
+                  <div className={`ps ${inv.paidAt ? 'done' : inv.paidAmountCents ? 'part' : ''}`}><span className="dot">{inv.paidAt ? '✓' : ''}</span><div><b>{inv.paidAt ? 'Paid' : inv.paidAmountCents ? 'Part paid' : 'Payment'}</b><small>{inv.paidAt ? `Paid ${day(inv.paidAt)}` : inv.paidAmountCents ? `${money(inv.paidAmountCents)} of ${money(inv.amountCents)} paid · balance due ${day(inv.dueAt)}` : `Due ${day(inv.dueAt)}`}</small></div></div>
+                  <div className={`ps ${pop ? 'done' : ''}`}><span className="dot">{pop ? '✓' : ''}</span><div><b>Proof of payment</b><small>{pop ? `Uploaded ${dayTime(pop.createdAt)}` : 'Shown here as soon as Potties pays'}</small></div></div>
+                </div>
+                <div className="docs" style={{ marginTop: 10 }}>
+                  {pop && <div className="doc"><span className="n"><span className="ft">{pop.mime === 'application/pdf' ? 'PDF' : 'IMG'}</span>Proof of payment · {inv.number}</span><a className="btn sm" href={`/api/files/${pop.id}`} target="_blank" rel="noreferrer">Download</a></div>}
+                  {invFile && <div className="doc"><span className="n"><span className="ft">PDF</span>Your invoice {inv.number}</span><a className="btn ghost sm" href={`/api/files/${invFile.id}`} target="_blank" rel="noreferrer">View</a></div>}
+                </div>
+              </>
+            );
+          })() : <p className="kv" style={{ margin: 0 }}>Potties has not received your invoice for this order yet. Please email it to Potties HQ. It shows here once it is recorded.</p>}
+          <Link className="lnk" href="/f/invoices" style={{ display: 'inline-block', marginTop: 10 }}>All my invoices →</Link>
+        </section>
       </div>
       </div>
     </main>

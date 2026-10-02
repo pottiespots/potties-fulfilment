@@ -14,9 +14,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [f] = await db.select().from(schema.orderFiles).where(eq(schema.orderFiles.id, id));
   if (!f) return new NextResponse('Not found', { status: 404 });
   if (u.role === 'FOUNDRY') {
-    if (f.kind === 'INVOICE' || f.kind === 'POP' || !f.orderId) return new NextResponse('Not found', { status: 404 });
-    const [o] = await db.select({ stage: schema.orders.stage }).from(schema.orders).where(eq(schema.orders.id, f.orderId));
-    if (!o || !visibleToFoundry(o.stage)) return new NextResponse('Not found', { status: 404 });
+    if (f.kind === 'INVOICE' || f.kind === 'POP') {
+      // Only the foundry's own invoices and our proofs of payment for them; never LL's or other suppliers'.
+      if (!f.invoiceId) return new NextResponse('Not found', { status: 404 });
+      const [inv] = await db.select({ supplier: schema.supplierInvoices.supplier }).from(schema.supplierInvoices).where(eq(schema.supplierInvoices.id, f.invoiceId));
+      if (!inv || inv.supplier !== 'FOUNDRY') return new NextResponse('Not found', { status: 404 });
+    } else if (!f.orderId) return new NextResponse('Not found', { status: 404 });
+    if (f.orderId) {
+      const [o] = await db.select({ stage: schema.orders.stage }).from(schema.orders).where(eq(schema.orders.id, f.orderId));
+      if (!o || !visibleToFoundry(o.stage)) return new NextResponse('Not found', { status: 404 });
+    }
   }
   if (f.driveUrl) return NextResponse.redirect(f.driveUrl); // stored in Google Drive (opens with the viewer's own Google login)
   const r = await getFile(f.storageKey);

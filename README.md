@@ -15,10 +15,10 @@ Built with Next.js 16, PostgreSQL (Drizzle ORM) and Supabase Storage. Runs on th
 | Upload proof photos | ✓ | ✓ |
 | Add tracking (sent to Shopify, customer emailed) | ✓ | ✓ |
 | Notes | ✓ | ✓ plus **HQ-only** notes the foundry never sees |
-| Own invoice status (paid / awaiting) | ✓ | ✓ |
+| Own invoices: received, paid, proof of payment (**My invoices**) | ✓ | ✓ |
 | Invoices, proof of payment, LL Manufacturing, stock, logins | — | ✓ |
 
-The foundry can’t open any HQ page, and every file download checks the login. Invoices and proofs of payment are never served to a foundry login.
+The foundry can’t open any HQ page, and every file download checks the login. The foundry can download its **own** invoices and the proofs of payment for them, and gets an email when an invoice is recorded, paid or a POP is uploaded. LL Manufacturing's and other suppliers' invoices and POPs are never served to a foundry login.
 
 **Compliance rules built in**
 

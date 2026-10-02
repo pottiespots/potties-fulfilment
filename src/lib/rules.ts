@@ -127,3 +127,11 @@ export const money = (cents: number) =>
 /** What is still owed on a supplier invoice: nothing once paid, otherwise the amount less any deposit already paid. */
 export const stillOwed = (i: { amountCents: number; paidAmountCents: number | null; paidAt: Date | null }) =>
   i.paidAt ? 0 : Math.max(0, i.amountCents - (i.paidAmountCents ?? 0));
+
+/** Payment status of a supplier invoice in plain words, for the foundry and HQ. */
+export function invoiceStatus(i: { amountCents: number; paidAmountCents: number | null; paidAt: Date | null; dueAt: Date }, now: Date): { label: string; tone: 'ok' | 'warn' | 'bad' | 'info' } {
+  if (i.paidAt) return { label: 'Paid', tone: 'ok' };
+  if (i.paidAmountCents && i.paidAmountCents > 0) return { label: `Part paid · ${money(i.paidAmountCents)} of ${money(i.amountCents)}`, tone: 'info' };
+  if (i.dueAt < now) return { label: 'Payment overdue', tone: 'bad' };
+  return { label: 'Awaiting payment', tone: 'warn' };
+}

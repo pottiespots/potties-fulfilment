@@ -26,6 +26,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
   const upload = uploadOrderFile.bind(null, o.id);
   const shopify = adminUrl(o.shopifyId);
   const invFile = o.invoice ? o.files.find((f) => f.invoiceId === o.invoice!.id && f.kind === 'INVOICE') : null;
+  const popFile = o.invoice ? [...o.files].reverse().find((f) => f.invoiceId === o.invoice!.id && f.kind === 'POP') : null;
 
   const steps = hqChecklist({ ...gateInput(o), acceptedAt: o.acceptedAt, packedAt: o.packedAt, shippedAt: o.shippedAt, trackingNumber: o.trackingNumber, sentAt: o.sentAt, deliveredAt: o.deliveredAt });
   const leftFoundry = o.stage === 'SHIPPED' || o.stage === 'DELIVERED';
@@ -225,7 +226,8 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
               <div className="docs">
                 <div className="doc"><span className="n"><span className="ft">XERO</span>Invoice {o.invoice.number} · <b className="num">{money(o.invoice.amountCents)}</b> · due {dayTime(o.invoice.dueAt).split(',').slice(0, 2).join(',')}</span>{invFile && <a className="btn ghost sm" href={`/api/files/${invFile.id}`}>View</a>}</div>
                 <div className="doc">
-                  <span className="n"><span className="ft">POP</span>{o.invoicePop ? 'Proof of payment attached' : 'Proof of payment'}</span>
+                  <span className="n"><span className="ft">POP</span>{o.invoicePop ? 'Proof of payment attached · the foundry can see it' : 'Proof of payment (the foundry sees it once uploaded)'}</span>
+                  {popFile && <a className="btn ghost sm" href={`/api/files/${popFile.id}`} target="_blank" rel="noreferrer">View</a>}
                   {!o.invoicePop && <UploadSlot action={uploadPop.bind(null, o.invoice.id)} kind="POP" label="Upload POP" filled={false} />}
                 </div>
               </div>

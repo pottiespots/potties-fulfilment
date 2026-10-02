@@ -7,7 +7,7 @@ import { getUser, actorLabel, hashPassword } from '@/lib/auth';
 import { getOrder, logEvent, touch } from '@/lib/data';
 import { db, schema } from '@/lib/db';
 import type { Stage, User } from '@/lib/db/schema';
-import { STAGE_LABEL, STAGES } from '@/lib/rules';
+import { STAGE_LABEL, STAGES, money } from '@/lib/rules';
 import { dayTime, fromLocalInput } from '@/lib/format';
 import { notifyFoundry, sendEmail } from '@/lib/notify';
 import { checkUpload, putFile, storageKey } from '@/lib/storage';
@@ -184,7 +184,8 @@ export async function createInvoice(_p: Res, fd: FormData): Promise<Res> {
     await putFile(key, Buffer.from(await file.arrayBuffer()), file.type);
     await db.insert(schema.orderFiles).values({ invoiceId: inv.id, orderId, kind: 'INVOICE', storageKey: key, filename: file.name, mime: file.type, size: file.size, uploadedById: u.id });
   }
-  if (orderId) await logEvent({ orderId, userId: u.id, actor: actorLabel(u), text: `Foundry invoice ${number} attached`, internal: true });
+  if (orderId) await logEvent({ orderId, userId: u.id, actor: actorLabel(u), text: `${supplier === 'FOUNDRY' ? 'Foundry' : 'LL'} invoice ${number} received`, internal: supplier !== 'FOUNDRY' });
+  if (supplier === 'FOUNDRY') await notifyFoundry(`Invoice ${number} received`, `Potties has received your invoice ${number} (${money(amountCents)}). Payment due ${dayTime(dueAt)}.`, orderId ? `/f/orders/${orderId}` : '/f/invoices');
   return done(`Invoice ${number} added`);
 }
 
@@ -192,7 +193,8 @@ export async function markInvoicePaid(invoiceId: string): Promise<Res> {
   const u = await requireHQ();
   const [inv] = await db.update(schema.supplierInvoices).set({ paidAt: new Date() }).where(eq(schema.supplierInvoices.id, invoiceId)).returning();
   if (!inv) return { error: 'Invoice not found.' };
-  if (inv.orderId) await logEvent({ orderId: inv.orderId, userId: u.id, actor: actorLabel(u), text: `Invoice ${inv.number} marked paid` });
+  if (inv.orderId) await logEvent({ orderId: inv.orderId, userId: u.id, actor: actorLabel(u), text: `Invoice ${inv.number} marked paid`, internal: inv.supplier !== 'FOUNDRY' });
+  if (inv.supplier === 'FOUNDRY') await notifyFoundry(`Invoice ${inv.number} paid`, `Potties has paid your invoice ${inv.number} (${money(inv.amountCents)}). The proof of payment will show under My invoices once uploaded.`, '/f/invoices');
   return done(`${inv.number} marked paid`);
 }
 
@@ -206,7 +208,8 @@ export async function uploadPop(invoiceId: string, _p: Res, fd: FormData): Promi
   await putFile(key, Buffer.from(await file.arrayBuffer()), file.type);
   await db.insert(schema.orderFiles).values({ invoiceId: inv.id, orderId: inv.orderId, kind: 'POP', storageKey: key, filename: file.name, mime: file.type, size: file.size, uploadedById: u.id });
   if (!inv.paidAt) await db.update(schema.supplierInvoices).set({ paidAt: new Date() }).where(eq(schema.supplierInvoices.id, inv.id));
-  if (inv.orderId) await logEvent({ orderId: inv.orderId, userId: u.id, actor: actorLabel(u), text: `Proof of payment uploaded for ${inv.number}`, internal: true });
+  if (inv.orderId) await logEvent({ orderId: inv.orderId, userId: u.id, actor: actorLabel(u), text: `Proof of payment uploaded for ${inv.number}`, internal: inv.supplier !== 'FOUNDRY' });
+  if (inv.supplier === 'FOUNDRY') await notifyFoundry(`Proof of payment for ${inv.number}`, `Potties has paid invoice ${inv.number} (${money(inv.amountCents)}). Download the proof of payment from the Order Desk.`, inv.orderId ? `/f/orders/${inv.orderId}#invoice` : '/f/invoices');
   return done('Proof of payment attached');
 }
 

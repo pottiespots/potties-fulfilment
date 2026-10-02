@@ -67,7 +67,8 @@ export async function getOrder(id: string, role: Role): Promise<OrderDetail | nu
   if (role === 'FOUNDRY' && !visibleToFoundry(o.stage)) return null;
   // Proof-of-payment files are stored with the order id, so they are already in allFiles.
   const invoicePop = !!invoice && allFiles.some((f) => f.invoiceId === invoice.id && f.kind === 'POP');
-  const files = role === 'FOUNDRY' ? allFiles.filter((f) => f.kind !== 'INVOICE' && f.kind !== 'POP') : allFiles;
+  // The foundry sees its own invoice and our proof of payment for it, never any other supplier's.
+  const files = role === 'FOUNDRY' ? allFiles.filter((f) => (f.kind !== 'INVOICE' && f.kind !== 'POP') || (!!invoice && f.invoiceId === invoice.id)) : allFiles;
   const events = role === 'FOUNDRY' ? allEvents.filter((e) => !e.internal) : allEvents;
   return { ...o, lines, fileKinds: allFiles.map((f) => f.kind), invoice: invoice ?? null, files, events, invoicePop };
 }
@@ -140,3 +141,25 @@ export async function productsWithStock(supplier: 'LL' | 'FOUNDRY') {
   });
 }
 export type StockRow = Awaited<ReturnType<typeof productsWithStock>>[number];
+
+/** The foundry's own invoices, with their files and whether each order is visible to the foundry. */
+export async function foundryInvoices() {
+  const [invs, files, orders] = await Promise.all([
+    db.select().from(schema.supplierInvoices).where(eq(schema.supplierInvoices.supplier, 'FOUNDRY')).orderBy(desc(schema.supplierInvoices.issuedAt)),
+    db.select({ invoiceId: schema.orderFiles.invoiceId, kind: schema.orderFiles.kind, id: schema.orderFiles.id, createdAt: schema.orderFiles.createdAt })
+      .from(schema.orderFiles).where(isNotNull(schema.orderFiles.invoiceId)),
+    db.select({ id: schema.orders.id, name: schema.orders.name, stage: schema.orders.stage }).from(schema.orders),
+  ]);
+  const byId = new Map(orders.map((o) => [o.id, o]));
+  return invs.map((i) => {
+    const o = i.orderId ? byId.get(i.orderId) : undefined;
+    const pop = files.filter((f) => f.invoiceId === i.id && f.kind === 'POP').at(-1);
+    return {
+      ...i,
+      order: o && visibleToFoundry(o.stage) ? { id: o.id, name: o.name } : null,
+      invoiceFileId: files.find((f) => f.invoiceId === i.id && f.kind === 'INVOICE')?.id ?? null,
+      popFileId: pop?.id ?? null, popAt: pop?.createdAt ?? null,
+    };
+  });
+}
+export type FoundryInvoice = Awaited<ReturnType<typeof foundryInvoices>>[number];
