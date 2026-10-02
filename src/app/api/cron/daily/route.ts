@@ -4,6 +4,7 @@ import { db, schema } from '@/lib/db';
 import { notifyFoundry, notifyHQ } from '@/lib/notify';
 import { acceptDeadline, timeLeftLabel } from '@/lib/rules';
 import { shopifyConfigured, syncRecentOrders } from '@/lib/shopify';
+import { refreshLedger } from '@/lib/shopify-insights';
 
 // Runs every morning (vercel.json). Catches orders missed by webhooks and emails a summary of
 // what's late, so nobody has to remember to look.
@@ -15,6 +16,7 @@ export async function GET(req: Request) {
   let synced = null;
   if (shopifyConfigured()) {
     try { synced = await syncRecentOrders(14); } catch (e) { console.error('[cron sync]', e); }
+    try { await refreshLedger(true); } catch (e) { console.error('[cron ledger]', e); }
   }
   const open = await db.select().from(schema.orders)
     .where(inArray(schema.orders.stage, ['SENT', 'ACCEPTED', 'MANUFACTURING', 'PACKING', 'PACKED']));

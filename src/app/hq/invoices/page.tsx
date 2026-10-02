@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth';
 import { invoicesWithPop, listOrders, purchaseOrdersFull } from '@/lib/data';
-import { money, stageIndex } from '@/lib/rules';
+import { money, stageIndex, stillOwed } from '@/lib/rules';
 import { day } from '@/lib/format';
 import { Pill, Tile } from '@/components/ui';
 import { ActButton, UploadSlot } from '@/components/client';
@@ -16,7 +16,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const { s = 'all' } = await searchParams;
   const now = new Date();
   const [invoices, orders, pos] = await Promise.all([invoicesWithPop(), listOrders('HQ'), purchaseOrdersFull()]);
-  const sum = (list: typeof invoices) => list.reduce((t, i) => t + i.amountCents, 0);
+  const sum = (list: typeof invoices) => list.reduce((t, i) => t + stillOwed(i), 0);
   const unpaid = invoices.filter((i) => !i.paidAt);
   const shown = invoices.filter((i) => s === 'all' || i.supplier === (s === 'll' ? 'LL' : s === 'other' ? 'OTHER' : 'FOUNDRY'))
     .sort((a, b) => Number(!!a.paidAt) - Number(!!b.paidAt) || a.dueAt.getTime() - b.dueAt.getTime());

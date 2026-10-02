@@ -123,3 +123,7 @@ export function courierFromShippingTitle(title: string | null | undefined): { co
 
 export const money = (cents: number) =>
   'R ' + (cents / 100).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+/** What is still owed on a supplier invoice: nothing once paid, otherwise the amount less any deposit already paid. */
+export const stillOwed = (i: { amountCents: number; paidAmountCents: number | null; paidAt: Date | null }) =>
+  i.paidAt ? 0 : Math.max(0, i.amountCents - (i.paidAmountCents ?? 0));

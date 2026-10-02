@@ -29,6 +29,13 @@
       "when": 1790925173823,
       "tag": "0003_address_override",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790937768021,
+      "tag": "0004_cash_ledger",
+      "breakpoints": true
     }
   ]
 }

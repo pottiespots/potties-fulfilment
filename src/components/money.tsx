@@ -1,7 +1,7 @@
 // Dashboard money panels: Shopify sales and cash in, supplier payments out, site visits.
 import Link from 'next/link';
-import { getSalesSummary, getTraffic, shopifyAdmin } from '@/lib/shopify-insights';
-import { RANGE_LABEL, change, type InsightRange, type SalesSummary } from '@/lib/insights-calc';
+import { getAllTime, getSalesSummary, getTraffic, shopifyAdmin } from '@/lib/shopify-insights';
+import { RANGE_LABEL, change, monthLabel, type InsightRange, type PeriodRange, type SalesSummary } from '@/lib/insights-calc';
 import type { InvoiceRow } from '@/lib/data';
 import { money } from '@/lib/rules';
 
@@ -40,7 +40,7 @@ export function RangeChips({ range, base }: { range: InsightRange; base: string 
 }
 
 /** Six headline figures: sales, cash in, paid out, net cash, still to collect, still to pay. */
-export async function MoneyStrip({ range, invoices, owedCents, detailHref }: { range: InsightRange; invoices: InvoiceRow[]; owedCents: number; detailHref?: string }) {
+export async function MoneyStrip({ range, invoices, owedCents, detailHref }: { range: PeriodRange; invoices: InvoiceRow[]; owedCents: number; detailHref?: string }) {
   const s = await getSalesSummary(range);
   if ('error' in s) return <ShopifyError error={s.error} />;
   const out = supplierOutflow(invoices, s);
@@ -50,7 +50,7 @@ export async function MoneyStrip({ range, invoices, owedCents, detailHref }: { r
     <section className="moneystrip" aria-label={`Money, ${RANGE_LABEL[range].toLowerCase()}`}>
       <div className="ms-head">
         <h3 className="h3">Money · {RANGE_LABEL[range]}</h3>
-        {detailHref && <Link className="lnk" href={detailHref}>Sales & cash details →</Link>}
+        {detailHref && <span className="btns"><Link className="lnk" href="/hq?view=money&range=all">Total cash flow (all time) →</Link><Link className="lnk" href={detailHref}>Sales & cash details →</Link></span>}
       </div>
       <div className="kpis">
         <Kpi label={`Sales · ${s.cur.orders} orders`} value={money(s.cur.netCents)}><Delta cur={s.cur.netCents} prev={s.prev.netCents} /></Kpi>
@@ -109,7 +109,7 @@ function Bars({ rows, total }: { rows: { name: string; cents: number; note?: str
   );
 }
 
-export async function SalesDetail({ range }: { range: InsightRange }) {
+export async function SalesDetail({ range }: { range: PeriodRange }) {
   const s = await getSalesSummary(range);
   if ('error' in s) return <ShopifyError error={s.error} />;
   const cash = s.gateways.reduce((t, g) => t + g.cents, 0);
@@ -149,7 +149,7 @@ export async function SalesDetail({ range }: { range: InsightRange }) {
   );
 }
 
-export async function TrafficPanel({ range }: { range: InsightRange }) {
+export async function TrafficPanel({ range }: { range: PeriodRange }) {
   const t = await getTraffic(range);
   const link = shopifyAdmin('/analytics');
   if ('error' in t) {
@@ -175,4 +175,73 @@ function TrafficDelta({ cur, prev }: { cur: number; prev: number }) {
 
 export function MoneySkeleton({ tall }: { tall?: boolean }) {
   return <div className="sec skel-box" style={{ minHeight: tall ? 320 : 120 }} aria-busy="true"><span className="sub2">Loading Shopify figures…</span></div>;
+}
+
+const signed = (c: number) => `${c < 0 ? '−' : ''}${money(Math.abs(c))}`;
+
+/** Total cash flow since the first sale: Shopify money in, supplier payments out, month by month. */
+export async function AllTimeCash({ owedCents }: { owedCents: number }) {
+  const [a, s] = await Promise.all([getAllTime(), getSalesSummary('30')]);
+  const collect = 'error' in s ? 0 : s.awaiting.cents;
+  const settled = a.totals.netCents + collect - owedCents;
+  const max = Math.max(...a.months.map((m) => Math.max(m.inCents, m.outCents + m.refundCents)), 1);
+  const since = a.firstAt ? new Date(a.firstAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Johannesburg' }) : null;
+  return (
+    <>
+      <section className="moneystrip" aria-label="Total cash flow, all time">
+        <div className="ms-head"><h3 className="h3">Total cash flow · all time{since ? ` (since ${since})` : ''}</h3></div>
+        <div className="kpis">
+          <Kpi label="Total cash in" value={money(a.totals.inCents)}><span className="delta">All Shopify payments</span></Kpi>
+          <Kpi label="Refunds paid" value={money(a.totals.refundCents)}><span className="delta">Back to customers</span></Kpi>
+          <Kpi label="Paid to suppliers" value={money(a.totals.outCents)}><span className="delta">Foundry, LL and others</span></Kpi>
+          <Kpi label="Net cash flow" value={signed(a.totals.netCents)} tone={a.totals.netCents < 0 ? 'bad' : 'ok'}><span className="delta">In − refunds − suppliers</span></Kpi>
+          <Kpi label="Still to collect" value={money(collect)}><span className="delta">From customers</span></Kpi>
+          <Kpi label="Still to pay suppliers" value={money(owedCents)}><span className="delta">Unpaid invoices</span></Kpi>
+          <Kpi label="Net once all settled" value={signed(settled)} tone={settled < 0 ? 'bad' : 'ok'}><span className="delta">Net + to collect − to pay</span></Kpi>
+        </div>
+      </section>
+      <div className="todaygrid">
+        <div className="sec">
+          <h4>Month by month</h4>
+          {a.months.length ? (
+            <div className="tbl-wrap" style={{ boxShadow: 'none', border: 0 }}>
+              <table className="cftbl">
+                <thead><tr><th>Month</th><th className="r">Cash in</th><th className="r">Refunds</th><th className="r">Paid to suppliers</th><th className="r">Net</th><th className="r">Running total</th></tr></thead>
+                <tbody>
+                  {[...a.months].reverse().map((m) => (
+                    <tr key={m.month}>
+                      <td><b>{monthLabel(m.month)}</b></td>
+                      <td className="r num">{money(m.inCents)}<span className="cfbar in" style={{ width: `${(m.inCents / max) * 100}%` }} /></td>
+                      <td className="r num">{m.refundCents ? money(m.refundCents) : '—'}</td>
+                      <td className="r num">{money(m.outCents)}<span className="cfbar out" style={{ width: `${(m.outCents / max) * 100}%` }} /></td>
+                      <td className={`r num ${m.netCents < 0 ? 'neg' : ''}`}>{signed(m.netCents)}</td>
+                      <td className={`r num ${m.balanceCents < 0 ? 'neg' : ''}`}><b>{signed(m.balanceCents)}</b></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td><b>Total</b></td><td className="r num"><b>{money(a.totals.inCents)}</b></td><td className="r num"><b>{money(a.totals.refundCents)}</b></td><td className="r num"><b>{money(a.totals.outCents)}</b></td><td className={`r num ${a.totals.netCents < 0 ? 'neg' : ''}`}><b>{signed(a.totals.netCents)}</b></td><td /></tr></tfoot>
+              </table>
+            </div>
+          ) : <div className="kv">No payments recorded yet. They appear here once Shopify is connected.</div>}
+        </div>
+        <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+          <div className="sec">
+            <h4>Paid to each supplier</h4>
+            <Bars rows={a.bySupplier} total={a.bySupplier[0]?.cents ?? 1} />
+            <Link className="lnk" href="/hq/invoices" style={{ display: 'inline-block', marginTop: 8 }}>All invoices →</Link>
+          </div>
+          <div className="sec">
+            <h4>About these figures</h4>
+            <ul className="notes">
+              <li><b>Cash in</b> is every payment taken on Shopify (PayFast, EFT, Shopify Payments), by the day it was paid.</li>
+              <li><b>Paid to suppliers</b> comes from the invoices in the Order Desk and the COGS sheet.{a.undatedPayments ? ` ${a.undatedPayments} part-paid invoice${a.undatedPayments === 1 ? ' is' : 's are'} counted in the month issued.` : ''}</li>
+              <li>Running costs (salaries, marketing, services) are not included yet. They are budgets in the COGS sheet, not payments.</li>
+              <li>Shopify only shares the last 60 days of orders, so the Order Desk keeps its own copy of every payment it sees. To load older history too, add the <b>read_all_orders</b> permission to the Shopify app.</li>
+              {a.ledgerError && <li className="err-text">Could not refresh from Shopify just now: {a.ledgerError}</li>}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }

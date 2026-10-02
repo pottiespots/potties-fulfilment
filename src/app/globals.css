@@ -489,3 +489,14 @@ footer.ver{text-align:center;font-size:11px;color:var(--faint);padding:10px 16px
 .thumb .btns{display:flex;flex-direction:column;align-items:stretch;gap:4px}
 .thumb .btns .kv{font-size:11px;color:var(--bad);font-weight:600;text-align:center}
 .thumb .btns button{width:100%;padding:4px 6px;font-size:12px}
+.cftbl{width:100%;border-collapse:collapse;font-size:14px}
+.cftbl th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.cftbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.cftbl .r{text-align:right}
+.cftbl tfoot td{border-bottom:0;border-top:2px solid var(--line)}
+.cftbl .neg{color:var(--bad)}
+.cfbar{display:block;height:4px;border-radius:2px;margin:4px 0 0 auto;max-width:100%}
+.cfbar.in{background:var(--chart,#d9691e)}
+.cfbar.out{background:var(--muted)}
+ul.notes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:6px}
+.todaygrid>*{min-width:0}

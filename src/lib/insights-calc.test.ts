@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { periodFor, summariseSales, change, type ShopifyOrderLite } from './insights-calc';
+import { periodFor, summariseSales, change, allTimeCashflow, type ShopifyOrderLite } from './insights-calc';
 
 const m = (a: number) => ({ shopMoney: { amount: String(a), currencyCode: 'ZAR' } });
 const now = new Date('2026-10-15T10:00:00Z'); // 12:00 in South Africa
@@ -44,5 +44,31 @@ describe('dashboard sales maths', () => {
   it('works out the change against last period', () => {
     expect(change(120, 100)).toBe(20);
     expect(change(5, 0)).toBeNull();
+  });
+});
+
+describe('all-time cash flow', () => {
+  it('adds money in and out per month with a running total', () => {
+    const a = allTimeCashflow(
+      [
+        { kind: 'in', amountCents: 100000, occurredAt: new Date('2026-08-21T08:00:00Z') },
+        { kind: 'in', amountCents: 500000, occurredAt: new Date('2026-09-14T08:00:00Z') },
+        { kind: 'refund', amountCents: 40000, occurredAt: new Date('2026-09-15T08:00:00Z') },
+      ],
+      [
+        { supplier: 'LL', supplierLabel: null, amountCents: 160000, paidAmountCents: 160000, paidAt: new Date('2026-09-21T08:00:00Z'), issuedAt: new Date('2026-09-10T08:00:00Z') },
+        { supplier: 'FOUNDRY', supplierLabel: null, amountCents: 200000, paidAmountCents: 100000, paidAt: null, issuedAt: new Date('2026-10-01T08:00:00Z') }, // deposit only
+        { supplier: 'FOUNDRY', supplierLabel: null, amountCents: 50000, paidAmountCents: null, paidAt: null, issuedAt: new Date('2026-10-01T08:00:00Z') }, // unpaid
+      ],
+      new Date('2026-10-15T08:00:00Z'));
+    expect(a.months.map((m) => m.month)).toEqual(['2026-08', '2026-09', '2026-10']);
+    expect(a.months.map((m) => m.balanceCents)).toEqual([100000, 400000, 300000]);
+    expect(a.totals).toEqual({ inCents: 600000, refundCents: 40000, outCents: 260000, netCents: 300000 });
+    expect(a.bySupplier).toEqual([{ name: 'LL Manufacturing', cents: 160000 }, { name: 'Foundry', cents: 100000 }]);
+    expect(a.undatedPayments).toBe(1);
+  });
+  it('fills empty months', () => {
+    const a = allTimeCashflow([{ kind: 'in', amountCents: 1, occurredAt: new Date('2026-06-28T08:00:00Z') }], [], new Date('2026-09-02T08:00:00Z'));
+    expect(a.months.map((m) => m.month)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
   });
 });

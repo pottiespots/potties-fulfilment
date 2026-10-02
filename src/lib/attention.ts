@@ -1,7 +1,7 @@
 // Builds the HQ "Needs your attention" list. Pure function so it can be tested.
 import type { OrderRow, InvoiceRow, PORow } from './data';
 import type { Product } from './db/schema';
-import { acceptDeadline, duration, HOUR, isOpen, money, STAGE_LABEL } from './rules';
+import { acceptDeadline, duration, HOUR, isOpen, money, STAGE_LABEL, stillOwed } from './rules';
 import { day } from './format';
 
 export type AttentionKind =
@@ -52,11 +52,12 @@ export function buildAttention(input: {
       A.push({ ...base, sev: 'warn', kind: 'custom-unchecked', title: 'Customisation not confirmed yet', detail: `Ships in ${duration(left(o.shipBy))} · “${custom.customText}”` });
     if (o.shopifySyncError && o.stage === 'SHIPPED' && !o.shopifyFulfillmentId) A.push({ ...base, sev: 'bad', kind: 'tracking-failed', title: 'Tracking did not reach Shopify', detail: o.shopifySyncError });
   }
+  const part = (i: InvoiceRow) => (i.paidAmountCents ? ` · ${money(i.paidAmountCents)} of ${money(i.amountCents)} already paid` : '');
   for (const i of invoices) {
     const base = { ref: i.number, invoiceId: i.id, sortAt: i.dueAt, supplier: i.supplier, supplierLabel: i.supplierLabel, orderId: i.orderId ?? undefined };
     // The supplier tag and invoice number are shown beside the title, so the title only says what's wrong.
-    if (!i.paidAt && i.dueAt < now) A.push({ ...base, sev: 'bad', kind: 'invoice-overdue', title: `Overdue · ${money(i.amountCents)}`, detail: `Was due ${duration(left(i.dueAt))} ago` });
-    else if (!i.paidAt) A.push({ ...base, sev: 'mute', kind: 'invoice-due', title: `Unpaid · ${money(i.amountCents)}`, detail: `Due ${day(i.dueAt)} (in ${duration(left(i.dueAt))})` });
+    if (!i.paidAt && i.dueAt < now) A.push({ ...base, sev: 'bad', kind: 'invoice-overdue', title: `Overdue · ${money(stillOwed(i))}`, detail: `Was due ${duration(left(i.dueAt))} ago${part(i)}` });
+    else if (!i.paidAt) A.push({ ...base, sev: 'mute', kind: 'invoice-due', title: `Unpaid · ${money(stillOwed(i))}`, detail: `Due ${day(i.dueAt)} (in ${duration(left(i.dueAt))})${part(i)}` });
     else if (!i.pop) A.push({ ...base, sortAt: undefined, sev: 'mute', kind: 'pop-missing', title: 'Paid · proof of payment missing', detail: 'Upload the POP for the audit trail' });
   }
   for (const p of pos) {

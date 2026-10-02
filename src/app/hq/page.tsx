@@ -3,14 +3,14 @@ import { Suspense } from 'react';
 import { requireRole } from '@/lib/auth';
 import { listOrders, invoicesWithPop, purchaseOrdersFull, productsWithStock } from '@/lib/data';
 import { buildAttention, ATTENTION_GROUP, type Attention, type AttentionGroup } from '@/lib/attention';
-import { STAGES, STAGE_SHORT, isOpen, money, DAY } from '@/lib/rules';
+import { STAGES, STAGE_SHORT, isOpen, money, DAY, stillOwed } from '@/lib/rules';
 import { day, time, longDate } from '@/lib/format';
 import { LeftPill } from '@/components/ui';
 import { ActButton } from '@/components/client';
 import { approveProof, chaseFoundry, markInvoicePaid } from '@/app/actions/hq';
 import { supplierName } from '@/lib/labels';
 import { SyncStatus } from '@/components/sync-status';
-import { MoneyStrip, MoneySkeleton, RangeChips, SalesDetail, TrafficPanel } from '@/components/money';
+import { AllTimeCash, MoneyStrip, MoneySkeleton, RangeChips, SalesDetail, TrafficPanel } from '@/components/money';
 import { isRange, type InsightRange } from '@/lib/insights-calc';
 import { shopifyAdmin } from '@/lib/shopify-insights';
 
@@ -82,12 +82,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const counts = STAGES.map((s) => orders.filter((o) => o.stage === s).length);
   const max = Math.max(...counts, 1);
   const week = orders.filter((o) => isOpen(o.stage) && o.shipBy >= now && o.shipBy.getTime() - now.getTime() < 7 * DAY);
-  const owedF = invoices.filter((i) => !i.paidAt && i.supplier === 'FOUNDRY').reduce((s, i) => s + i.amountCents, 0);
-  const owedL = invoices.filter((i) => !i.paidAt && i.supplier !== 'FOUNDRY').reduce((s, i) => s + i.amountCents, 0);
+  const owedF = invoices.filter((i) => !i.paidAt && i.supplier === 'FOUNDRY').reduce((s, i) => s + stillOwed(i), 0);
+  const owedL = invoices.filter((i) => !i.paidAt && i.supplier !== 'FOUNDRY').reduce((s, i) => s + stillOwed(i), 0);
   const unpaid = invoices.filter((i) => !i.paidAt).sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
   const overdue = unpaid.filter((i) => i.dueAt < now);
   const dueSoon = unpaid.filter((i) => i.dueAt >= now && i.dueAt.getTime() - now.getTime() < 7 * DAY);
-  const sum = (l: typeof invoices) => l.reduce((t, i) => t + i.amountCents, 0);
+  const sum = (l: typeof invoices) => l.reduce((t, i) => t + stillOwed(i), 0);
   const openPos = pos.filter((p) => p.status !== 'DELIVERED' && p.status !== 'CANCELLED');
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const delivered = orders.filter((o) => o.deliveredAt && o.deliveredAt >= monthStart);
@@ -116,6 +116,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {view === 'money' && (
         <>
           <RangeChips range={range} base="/hq?view=money" />
+          {range === 'all' ? (
+            <Suspense key="all" fallback={<MoneySkeleton tall />}><AllTimeCash owedCents={owedF + owedL} /></Suspense>
+          ) : <>
           <Suspense key={`strip-${range}`} fallback={<MoneySkeleton />}>
             <MoneyStrip range={range} invoices={invoices} owedCents={owedF + owedL} />
           </Suspense>
@@ -138,6 +141,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <ShopifyLinks />
             </div>
           </div>
+          </>}
         </>
       )}
       {(view === 'all' || view === 'orders') && <div className="pipe">
@@ -203,7 +207,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <h4>Next payments <span className="num">{unpaid.length}</span></h4>
                 {unpaid.length ? unpaid.slice(0, 8).map((i) => (
                   <Link key={i.id} href="/hq/invoices" className="mini" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <b>{day(i.dueAt)}</b><span>{supplierName(i.supplier, i.supplierLabel)} · {i.number}</span><b className="num">{money(i.amountCents)}</b>
+                    <b>{day(i.dueAt)}</b><span>{supplierName(i.supplier, i.supplierLabel)} · {i.number}</span><b className="num">{money(stillOwed(i))}</b>
                   </Link>
                 )) : <div className="kv">Nothing unpaid</div>}
                 <Link className="lnk" href="/hq/invoices" style={{ display: 'inline-block', marginTop: 8 }}>All invoices →</Link>

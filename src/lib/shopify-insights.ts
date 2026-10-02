@@ -4,7 +4,7 @@ import { cache } from 'react';
 import { eq } from 'drizzle-orm';
 import { db, schema } from './db';
 import { gql, shopifyConfigured } from './shopify';
-import { periodFor, summariseSales, type InsightRange, type ShopifyOrderLite, type SalesSummary, type Traffic } from './insights-calc';
+import { allTimeCashflow, periodFor, summariseSales, type AllTime, type PeriodRange, type ShopifyOrderLite, type SalesSummary, type Traffic } from './insights-calc';
 
 export type { InsightRange, SalesSummary, Traffic } from './insights-calc';
 
@@ -30,7 +30,7 @@ const ORDER_QUERY = `query($q: String!, $after: String) {
       totalPriceSet { shopMoney { amount currencyCode } }
       totalRefundedSet { shopMoney { amount } }
       totalOutstandingSet { shopMoney { amount } }
-      transactions(first: 20) { kind status processedAt gateway formattedGateway amountSet { shopMoney { amount } } }
+      transactions(first: 20) { id kind status processedAt gateway formattedGateway amountSet { shopMoney { amount } } }
       lineItems(first: 20) { nodes { title quantity discountedTotalSet { shopMoney { amount } } } }
     }
     pageInfo { hasNextPage endCursor }
@@ -52,13 +52,14 @@ async function fetchOrders(since: Date): Promise<{ orders: ShopifyOrderLite[]; t
 }
 
 // cache(): the summary strip and the detail panel share one Shopify fetch per page load.
-export const getSalesSummary = cache(async (range: InsightRange): Promise<SalesSummary | { error: string }> => {
+export const getSalesSummary = cache(async (range: PeriodRange): Promise<SalesSummary | { error: string }> => {
   const now = new Date(), force = false;
   if (!shopifyConfigured()) return { error: 'Shopify is not connected yet.' };
   try {
     return await cached(`insights:sales:${range}`, async () => {
       const p = periodFor(range, now);
       const { orders, truncated } = await fetchOrders(p.prevFrom);
+      await recordLedger(orders).catch((e) => console.error('[ledger]', e));
       return { ...summariseSales(orders, p, now), range, truncated };
     }, force);
   } catch (e) {
@@ -92,7 +93,7 @@ async function trafficFor(from: Date, to: Date) {
   return { sessions: r.sessions ?? 0, visitors: r.online_store_visitors ?? 0, conversionRate: r.conversion_rate ?? 0 };
 }
 
-export const getTraffic = cache(async (range: InsightRange): Promise<Traffic | { error: string }> => {
+export const getTraffic = cache(async (range: PeriodRange): Promise<Traffic | { error: string }> => {
   const now = new Date(), force = false;
   if (!shopifyConfigured()) return { error: 'Shopify is not connected yet.' };
   try {
@@ -114,4 +115,45 @@ export const getTraffic = cache(async (range: InsightRange): Promise<Traffic | {
 export function shopifyAdmin(path = '') {
   const d = process.env.SHOPIFY_STORE_DOMAIN;
   return d ? `https://${d.replace(/^https?:\/\//, '').replace(/\/$/, '')}/admin${path}` : null;
+}
+
+// ---------------- all-time cash ledger ----------------
+/** Saves every successful Shopify payment and refund, so history survives Shopify's 60-day window. */
+export async function recordLedger(orders: ShopifyOrderLite[]) {
+  const rows = orders.filter((o) => !o.test).flatMap((o) => o.transactions
+    .filter((t) => t.id && t.status === 'SUCCESS' && t.processedAt && ['SALE', 'CAPTURE', 'REFUND'].includes(t.kind))
+    .map((t) => ({
+      id: t.id!, source: 'shopify', orderName: o.name, kind: t.kind === 'REFUND' ? 'refund' : 'in',
+      amountCents: Math.round(Number(t.amountSet.shopMoney.amount) * 100), gateway: t.formattedGateway || t.gateway, occurredAt: new Date(t.processedAt!),
+    })));
+  for (let i = 0; i < rows.length; i += 200) await db.insert(schema.cashLedger).values(rows.slice(i, i + 200)).onConflictDoNothing();
+  return rows.length;
+}
+
+/** Reads every order Shopify will share (60 days, or all with read_all_orders) into the ledger. At most every 6 hours unless forced. */
+export async function refreshLedger(force = false) {
+  if (!shopifyConfigured()) return null;
+  const key = 'ledger:fullAt';
+  if (!force) {
+    const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
+    if (row && Date.now() - row.updatedAt.getTime() < 6 * 3600e3) return null;
+  }
+  const { orders } = await fetchOrders(new Date(0));
+  const n = await recordLedger(orders);
+  await db.insert(schema.settings).values({ key, value: String(n), updatedAt: new Date() })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value: String(n), updatedAt: new Date() } });
+  return n;
+}
+
+export async function getAllTime(now = new Date()): Promise<AllTime & { ledgerError: string | null }> {
+  let ledgerError: string | null = null;
+  try { await refreshLedger(); } catch (e) { ledgerError = (e as Error).message; }
+  const [ledger, invoices] = await Promise.all([
+    db.select({ kind: schema.cashLedger.kind, amountCents: schema.cashLedger.amountCents, occurredAt: schema.cashLedger.occurredAt }).from(schema.cashLedger),
+    db.select({
+      supplier: schema.supplierInvoices.supplier, supplierLabel: schema.supplierInvoices.supplierLabel, amountCents: schema.supplierInvoices.amountCents,
+      paidAmountCents: schema.supplierInvoices.paidAmountCents, paidAt: schema.supplierInvoices.paidAt, issuedAt: schema.supplierInvoices.issuedAt,
+    }).from(schema.supplierInvoices),
+  ]);
+  return { ...allTimeCashflow(ledger, invoices, now), ledgerError };
 }

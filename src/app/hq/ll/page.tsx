@@ -1,6 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { invoicesWithPop, productsWithStock, purchaseOrdersFull } from '@/lib/data';
-import { money, duration } from '@/lib/rules';
+import { money, duration, stillOwed } from '@/lib/rules';
 import { day, ymd } from '@/lib/format';
 import { Pill, Tile } from '@/components/ui';
 import { ActButton, ActForm, Submit, UploadSlot } from '@/components/client';
@@ -24,8 +24,8 @@ export default async function LL({ searchParams }: { searchParams: Promise<{ ord
     <main className="page">
       <div className="hello"><div><h2>LL Manufacturing</h2><p>Canvas covers, bags and leather aprons. Only Potties HQ manages this. LL Manufacturing does not log in.</p></div></div>
       <div className="ftiles">
-        <Tile tone="warn" v={money(unpaid.reduce((s, i) => s + i.amountCents, 0))} l="Still to pay LL" s={`${unpaid.length} invoices`} />
-        <Tile tone={overdue.length ? 'bad' : ''} v={money(overdue.reduce((s, i) => s + i.amountCents, 0))} l="Overdue" s={`${overdue.length} past due date`} />
+        <Tile tone="warn" v={money(unpaid.reduce((s, i) => s + stillOwed(i), 0))} l="Still to pay LL" s={`${unpaid.length} invoices`} />
+        <Tile tone={overdue.length ? 'bad' : ''} v={money(overdue.reduce((s, i) => s + stillOwed(i), 0))} l="Overdue" s={`${overdue.length} past due date`} />
         <Tile v={openPos.reduce((s, p) => s + p.lines.reduce((a, l) => a + l.quantity, 0), 0)} l="Units on order" s={`${openPos.length} open POs`} />
         <Tile tone={low.length ? 'warn' : ''} v={low.length} l="Need reordering" s="Below reorder level" />
       </div>

@@ -167,6 +167,18 @@ export const supplierInvoices = pgTable('supplier_invoices', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 }, (t) => [index('supplier_invoices_order_idx').on(t.orderId), uniqueIndex('supplier_invoices_number_idx').on(t.supplier, t.number)]);
 
+/** Every Shopify payment and refund the dashboard has seen. Kept for good, because Shopify only shares the last 60 days of orders. */
+export const cashLedger = pgTable('cash_ledger', {
+  id: text('id').primaryKey(), // Shopify transaction id
+  source: text('source').notNull().default('shopify'),
+  orderName: text('order_name'),
+  kind: text('kind').notNull(), // 'in' (sale / capture) or 'refund'
+  amountCents: integer('amount_cents').notNull(),
+  gateway: text('gateway'),
+  occurredAt: ts('occurred_at').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('cash_ledger_at_idx').on(t.occurredAt)]);
+
 /** One row per run of the daily COGS-sheet routine (or any other integration). */
 export const syncRuns = pgTable('sync_runs', {
   id: uuid('id').primaryKey().defaultRandom(),

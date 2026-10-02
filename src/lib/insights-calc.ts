@@ -1,21 +1,23 @@
 // Pure maths behind the dashboard's sales and cash figures (tested in insights-calc.test.ts).
 
-export type InsightRange = '7' | '30' | 'month';
-export const RANGE_LABEL: Record<InsightRange, string> = { '7': 'Last 7 days', '30': 'Last 30 days', month: 'This month' };
-export const isRange = (v: string | undefined): v is InsightRange => v === '7' || v === '30' || v === 'month';
+export type InsightRange = '7' | '30' | 'month' | 'all';
+/** Ranges that use the period comparison (everything except All time). */
+export type PeriodRange = Exclude<InsightRange, 'all'>;
+export const RANGE_LABEL: Record<InsightRange, string> = { '7': 'Last 7 days', '30': 'Last 30 days', month: 'This month', all: 'All time' };
+export const isRange = (v: string | undefined): v is InsightRange => v === '7' || v === '30' || v === 'month' || v === 'all';
 
 type Money = { shopMoney: { amount: string; currencyCode?: string } };
 export type ShopifyOrderLite = {
   id: string; name: string; createdAt: string; cancelledAt: string | null; test: boolean; sourceName: string | null;
   displayFinancialStatus: string | null;
   totalPriceSet: Money; totalRefundedSet: Money; totalOutstandingSet: Money;
-  transactions: { kind: string; status: string; processedAt: string | null; gateway: string | null; formattedGateway: string | null; amountSet: Money }[];
+  transactions: { id?: string; kind: string; status: string; processedAt: string | null; gateway: string | null; formattedGateway: string | null; amountSet: Money }[];
   lineItems: { nodes: { title: string; quantity: number; discountedTotalSet: Money }[] };
 };
 
 export type PeriodTotals = { orders: number; salesCents: number; refundsCents: number; netCents: number; aovCents: number; cashInCents: number; refundsPaidCents: number };
 export type SalesSummary = {
-  range: InsightRange; from: string; to: string; prevFrom: string; prevTo: string; currency: string;
+  range: PeriodRange; from: string; to: string; prevFrom: string; prevTo: string; currency: string;
   cur: PeriodTotals; prev: PeriodTotals;
   daily: { date: string; netCents: number; orders: number }[];
   gateways: { name: string; cents: number }[];
@@ -38,7 +40,7 @@ export const saDay = (d: Date) => new Date(d.getTime() + SA_OFFSET).toISOString(
 
 export type Period = { from: Date; to: Date; prevFrom: Date; prevTo: Date };
 /** The chosen period, and the one just before it of the same length, for comparison. */
-export function periodFor(range: InsightRange, now: Date): Period {
+export function periodFor(range: PeriodRange, now: Date): Period {
   const today = saMidnight(now);
   if (range === 'month') {
     const sa = new Date(now.getTime() + SA_OFFSET);
@@ -124,3 +126,64 @@ export function change(cur: number, prev: number): number | null {
   if (!prev) return null;
   return Math.round(((cur - prev) / Math.abs(prev)) * 100);
 }
+
+// ---------------- all-time cash flow ----------------
+export type LedgerRow = { kind: string; amountCents: number; occurredAt: Date };
+export type InvoiceLite = { supplier: string; supplierLabel: string | null; amountCents: number; paidAmountCents: number | null; paidAt: Date | null; issuedAt: Date };
+export type MonthRow = { month: string; inCents: number; refundCents: number; outCents: number; netCents: number; balanceCents: number };
+export type AllTime = {
+  months: MonthRow[];
+  totals: { inCents: number; refundCents: number; outCents: number; netCents: number };
+  bySupplier: { name: string; cents: number }[];
+  firstAt: Date | null; undatedPayments: number;
+};
+
+const saMonth = (d: Date) => saDay(d).slice(0, 7);
+const supplierLabel = (i: InvoiceLite) => (i.supplier === 'FOUNDRY' ? 'Foundry' : i.supplier === 'LL' ? 'LL Manufacturing' : i.supplierLabel || 'Other suppliers');
+
+/** Month-by-month money in (Shopify) and out (suppliers), with a running total, from the first payment to now. */
+export function allTimeCashflow(ledger: LedgerRow[], invoices: InvoiceLite[], now: Date): AllTime {
+  const months = new Map<string, MonthRow>();
+  const row = (m: string) => {
+    let r = months.get(m);
+    if (!r) { r = { month: m, inCents: 0, refundCents: 0, outCents: 0, netCents: 0, balanceCents: 0 }; months.set(m, r); }
+    return r;
+  };
+  let first: Date | null = null;
+  const seen = (d: Date) => { if (!first || d < first) first = d; };
+  for (const l of ledger) {
+    if (l.kind === 'in') row(saMonth(l.occurredAt)).inCents += l.amountCents;
+    else if (l.kind === 'refund') row(saMonth(l.occurredAt)).refundCents += l.amountCents;
+    else continue;
+    seen(l.occurredAt);
+  }
+  const suppliers = new Map<string, number>();
+  let undated = 0;
+  for (const i of invoices) {
+    const paid = i.paidAmountCents ?? (i.paidAt ? i.amountCents : 0);
+    if (paid <= 0) continue;
+    // Part-paid invoices have no payment date yet; they are counted in the month the invoice was issued.
+    const at = i.paidAt ?? i.issuedAt;
+    if (!i.paidAt) undated++;
+    row(saMonth(at)).outCents += paid;
+    seen(at);
+    suppliers.set(supplierLabel(i), (suppliers.get(supplierLabel(i)) ?? 0) + paid);
+  }
+  // Fill empty months so the table has no gaps.
+  if (first) {
+    const d = new Date(`${saMonth(first)}-15T12:00:00Z`), end = saMonth(now);
+    while (saMonth(d) <= end) { row(saMonth(d)); d.setUTCMonth(d.getUTCMonth() + 1); }
+  }
+  const list = [...months.values()].sort((a, b) => a.month.localeCompare(b.month));
+  let bal = 0;
+  const totals = { inCents: 0, refundCents: 0, outCents: 0, netCents: 0 };
+  for (const r of list) {
+    r.netCents = r.inCents - r.refundCents - r.outCents;
+    bal += r.netCents; r.balanceCents = bal;
+    totals.inCents += r.inCents; totals.refundCents += r.refundCents; totals.outCents += r.outCents;
+  }
+  totals.netCents = totals.inCents - totals.refundCents - totals.outCents;
+  return { months: list, totals, bySupplier: [...suppliers].map(([name, cents]) => ({ name, cents })).sort((a, b) => b.cents - a.cents), firstAt: first, undatedPayments: undated };
+}
+
+export const monthLabel = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
