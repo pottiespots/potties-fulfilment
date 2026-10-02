@@ -19,8 +19,8 @@ export const STAGE_SHORT: Record<Stage, string> = {
 // What the foundry reads on its own screens.
 export const FOUNDRY_LABEL: Record<Stage, string> = {
   NEW: 'Not sent yet', SENT: 'New: please accept', ACCEPTED: 'Accepted', MANUFACTURING: 'In manufacturing',
-  PACKING: 'Packing', PACKED: 'Packed, waiting for courier', SHIPPED: 'Collected, tracking sent',
-  DELIVERED: 'Delivered', CANCELLED: 'Cancelled',
+  PACKING: 'Packing', PACKED: 'Packed, waiting for courier', SHIPPED: 'Complete: collected by courier',
+  DELIVERED: 'Complete: delivered', CANCELLED: 'Cancelled',
 };
 
 /** Stages the foundry may set with the status buttons (accepting and shipping have their own actions). */

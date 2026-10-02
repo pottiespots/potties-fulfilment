@@ -441,3 +441,37 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 .ftile.link .go{font-size:12px;font-weight:700;color:var(--ember);margin-top:6px}
 .ftile.link[aria-current]{border:2px solid var(--fg)}
 .showing{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-8px 0 14px;font-size:14px}
+/* foundry order: content + to-do list on the right */
+.page.fpage{max-width:1280px}
+.fgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start;margin-top:14px}
+.fmain{grid-column:1;grid-row:1}
+.fside{grid-column:2;grid-row:1;position:sticky;top:14px}
+@media (max-width:900px){.fgrid{grid-template-columns:minmax(0,1fr)}.fside{grid-column:1;grid-row:1;position:static}.fmain{grid-row:2}}
+.todo{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px}
+.todo summary{list-style:none;cursor:pointer;display:grid;gap:6px}
+.todo summary::-webkit-details-marker{display:none}
+.todo-t{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.todo.complete .todo-t{color:var(--ok)}
+.todo-c{font-size:20px;font-weight:700}
+.todo-bar{height:6px;border-radius:3px;background:color-mix(in srgb,var(--line) 70%,transparent);overflow:hidden}
+.todo-bar i{display:block;height:100%;background:var(--ember);border-radius:3px}
+.todo.complete .todo-bar i{background:var(--ok)}
+.todo-next{font-size:13px;color:var(--muted)}
+.todo-done{margin-top:10px;background:var(--ok-bg);color:var(--ok);border-radius:8px;padding:10px 12px;font-size:14px;font-weight:600}
+.todo-late{margin-top:10px;background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:8px 10px;font-size:13px}
+.todo-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:0;position:relative}
+.todo-list li{position:relative}
+.todo-list li:not(:last-child)::after{content:"";position:absolute;left:11px;top:30px;bottom:-4px;width:2px;background:var(--line)}
+.todo-list li.done:not(:last-child)::after{background:var(--ok)}
+.todo-list a,.todo-list .row{display:flex;gap:10px;align-items:flex-start;padding:6px 6px 8px 0;border-radius:8px;text-decoration:none;color:inherit}
+.todo-list a:hover{background:color-mix(in srgb,var(--ember) 7%,transparent)}
+.todo-list .dot{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;position:relative;z-index:1}
+.todo-list li.done .dot{background:var(--ok);border-color:var(--ok)}
+.todo-list li.next .dot{border-color:var(--ember);box-shadow:0 0 0 3px var(--ember-soft)}
+.todo-list .txt{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;font-size:14px}
+.todo-list .txt small{font-size:12px;color:var(--muted)}
+.todo-list li.done .txt b{color:var(--muted);font-weight:600}
+.todo-list li.next .txt b{color:var(--fg)}
+.todo-list .now{flex:none;font-size:11px;font-weight:700;color:var(--on-accent);background:var(--ember);border-radius:999px;padding:2px 8px;margin-top:2px}
+.todo-list li.final .txt b{font-weight:800}
+:root.dark .todo-list li.done .dot{color:#1b1916}

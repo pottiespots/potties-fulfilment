@@ -6,7 +6,8 @@ import { FOUNDRY_LABEL, FOUNDRY_SETTABLE, canAddTracking, packedBlockers, money 
 import { dayTime } from '@/lib/format';
 import { KIND_LABEL, PHOTO_SLOTS, COURIERS, NOTE_PRESETS } from '@/lib/labels';
 import { acceptOrder, askQuestion, setFoundryStage, setCheck, uploadOrderFile, addNote, addTracking } from '@/app/actions/orders';
-import { ShipTo, Timeline, addressText, Pill } from '@/components/ui';
+import { ShipTo, Timeline, addressText, Pill, Checklist } from '@/components/ui';
+import { foundryChecklist, foundryComplete } from '@/lib/checklist';
 import { ActButton, ActForm, CheckToggle, CopyButton, NoteBox, Submit, UploadSlot } from '@/components/client';
 import { FileThumbs } from '@/components/files';
 
@@ -26,15 +27,21 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
   const slotKinds = PHOTO_SLOTS.filter((k) => k !== 'PHOTO_CUSTOM' || custom.length);
   const upload = uploadOrderFile.bind(null, o.id);
   const docs = o.files.filter((f) => f.kind === 'WAYBILL' || f.kind === 'ARTWORK');
+  const steps = foundryChecklist({ ...g, acceptedAt: o.acceptedAt, packedAt: o.packedAt, shippedAt: o.shippedAt, trackingNumber: o.trackingNumber });
+  const complete = foundryComplete(o);
 
   return (
-    <main className="page narrow">
+    <main className="page fpage">
       <Link href="/f" className="back">← My orders</Link>
       <div className="ohead">
         <div><h1>{o.name} · {o.customerName}</h1><div className="sub">{FOUNDRY_LABEL[o.stage]}</div></div>
       </div>
 
-      <div className="stack" style={{ marginTop: 14 }}>
+      <div className="fgrid">
+      <aside className="fside">
+        {o.stage !== 'CANCELLED' && <Checklist steps={steps} complete={complete} shippedAt={o.shippedAt} shipBy={o.shipBy} now={now} />}
+      </aside>
+      <div className="stack fmain">
         <section className="sec">
           <h4>Ship to <CopyButton text={addressText(o)} /></h4>
           <ShipTo o={o} now={now} />
@@ -42,7 +49,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         </section>
 
         {o.stage === 'SENT' && (
-          <section className="sec action">
+          <section className="sec action" id="status">
             <h4>Step 1 · Accept this order</h4>
             <p style={{ margin: '0 0 12px', fontSize: 14 }}>Check the packing slip and customisation. Accepting confirms it will be ready for the courier by <b>{dayTime(o.shipBy)}</b>.</p>
             <div className="btns"><ActButton action={acceptOrder.bind(null, o.id)}>Accept order</ActButton></div>
@@ -57,7 +64,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         )}
 
         {['ACCEPTED', 'MANUFACTURING', 'PACKING', 'PACKED'].includes(o.stage) && (
-          <section className="sec action">
+          <section className="sec action" id="status">
             <h4>Update status</h4>
             <ActForm action={setFoundryStage.bind(null, o.id)}>
               <div className="statusgrid">
@@ -76,7 +83,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
 
         {o.openQuestion && <div className="flash ok">Your question is with Potties HQ: “{o.openQuestion}”</div>}
 
-        <section className="sec">
+        <section className="sec" id="make">
           <h4>What to make</h4>
           <div className="makebox">
             {o.lines.map((l) => (
@@ -108,7 +115,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
           </div>
         </section>
 
-        <section className="sec">
+        <section className="sec" id="proof">
           <h4>Upload proof <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>photos or PDF · * needed to mark Packed</span></h4>
           <div className="photos">
             {slotKinds.map((k) => {
@@ -120,7 +127,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
           <FileThumbs files={o.files.filter((f) => f.kind.startsWith('PHOTO_') || f.kind === 'OTHER')} />
         </section>
 
-        <section className={`sec ${o.stage === 'PACKED' ? 'action' : ''}`}>
+        <section className={`sec ${o.stage === 'PACKED' ? 'action' : ''}`} id="tracking">
           <h4>Tracking number</h4>
           {o.trackingNumber ? (
             <div className="sent-ok">{o.trackingCompany} · <span className="mono">{o.trackingNumber}</span><br />{o.shopifyFulfillmentId ? 'Sent to Shopify. The customer has their tracking link.' : 'Saved. Potties HQ will make sure the customer gets it.'}</div>
@@ -145,6 +152,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         <div style={{ padding: '0 4px', fontSize: 13, color: 'var(--muted)' }}>
           Your invoice: {o.invoice ? <>{o.invoice.number} · {money(o.invoice.amountCents)} · {o.invoice.paidAt ? <Pill tone="ok">Paid</Pill> : <Pill tone="warn">Awaiting payment</Pill>}</> : 'not received yet'}
         </div>
+      </div>
       </div>
     </main>
   );

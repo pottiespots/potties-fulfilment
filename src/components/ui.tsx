@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Event, Order, User } from '@/lib/db/schema';
+import type { Step } from '@/lib/checklist';
 import { STAGES, STAGE_SHORT, stageIndex, timeLeftLabel, urgency, isOpen, duration, DAY } from '@/lib/rules';
 import { day, dayTime, time, initials, ymd } from '@/lib/format';
 import { NavTabs, ThemeToggle } from './client';
@@ -159,4 +160,40 @@ export function Tile({ v, l, s, tone = '', href, active }: { v: React.ReactNode;
   const body = <><span className="v num">{v}</span><span className="l">{l}</span>{s && <span className="s">{s}</span>}</>;
   if (!href) return <div className={`ftile ${tone}`}>{body}</div>;
   return <Link href={href} scroll={false} className={`ftile link ${tone}`} aria-current={active ? 'true' : undefined}>{body}<span className="go" aria-hidden>{active ? 'Showing ✓' : 'Show →'}</span></Link>;
+}
+
+/** The foundry's to-do list for an order, shown beside the order on wide screens and at the top on phones. */
+export function Checklist({ steps, complete, shippedAt, shipBy, now }: { steps: Step[]; complete: boolean; shippedAt: Date | null; shipBy: Date; now: Date }) {
+  const done = steps.filter((s) => s.done).length;
+  const next = steps.find((s) => !s.done);
+  const pct = complete ? 100 : Math.round((done / steps.length) * 100);
+  return (
+    <details className={`todo ${complete ? 'complete' : ''}`} open>
+      <summary>
+        <span className="todo-t">{complete ? 'Order complete' : 'To do'}</span>
+        <span className="todo-c num">{complete ? 'Left the foundry' : `${done} of ${steps.length} done`}</span>
+        <span className="todo-bar" aria-hidden><i style={{ width: `${pct}%` }} /></span>
+        {!complete && next && <span className="todo-next">Next: <b>{next.label}</b> · ship by {day(shipBy)} {time(shipBy)}</span>}
+      </summary>
+      {complete && <div className="todo-done">✓ This order has left the foundry{shippedAt ? ` (${day(shippedAt)})` : ''}. Nothing more to do. Thank you!</div>}
+      <ol className="todo-list">
+        {steps.map((s) => {
+          const isNext = !complete && s === next;
+          return (
+            <li key={s.key} className={s.done ? 'done' : isNext ? 'next' : ''}>
+              <a href={s.href}>
+                <span className="dot" aria-hidden>{s.done ? '✓' : ''}</span>
+                <span className="txt"><b>{s.label}</b><small>{s.done ? (s.at ? `Done ${day(s.at)} ${time(s.at)}` : 'Done') : complete ? 'Not recorded' : isNext ? s.hint : 'To do'}</small></span>
+                {isNext && <span className="now">Do this next</span>}
+              </a>
+            </li>
+          );
+        })}
+        <li className={complete ? 'done final' : 'final'}>
+          <span className="row"><span className="dot" aria-hidden>{complete ? '✓' : ''}</span><span className="txt"><b>Order complete</b><small>{complete ? 'Left the foundry' : 'Happens as soon as the courier has collected'}</small></span></span>
+        </li>
+      </ol>
+      {!complete && now > shipBy && <div className="todo-late">Past the ship-by date. Please finish the next step or add a note about the delay.</div>}
+    </details>
+  );
 }

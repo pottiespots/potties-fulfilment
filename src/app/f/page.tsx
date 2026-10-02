@@ -76,7 +76,7 @@ export default async function MyOrders({ searchParams }: { searchParams: Promise
         {late.length > 0 && group('Late', late, '', 'g-bad')}
         {group('Ship in the next 3 days', soon, 'Nothing due in the next 3 days.')}
         {group('Coming up', later, 'Nothing further out yet.')}
-        {group('Shipped', shipped, 'Nothing shipped yet.')}
+        {group('Complete (left the foundry)', shipped, 'Nothing completed yet.')}
       </>}
     </main>
   );
