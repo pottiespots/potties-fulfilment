@@ -5,10 +5,11 @@ import { revalidatePath } from 'next/cache';
 import { getUser, actorLabel } from '@/lib/auth';
 import { getOrder, logEvent, touch, gateInput, type OrderDetail } from '@/lib/data';
 import { db, schema } from '@/lib/db';
+import { and, eq } from 'drizzle-orm';
 import type { FileKind, User } from '@/lib/db/schema';
 import { canAddTracking, canSetFoundryStage, FOUNDRY_LABEL } from '@/lib/rules';
 import { KIND_LABEL } from '@/lib/labels';
-import { checkUpload, putFile, storageKey } from '@/lib/storage';
+import { checkUpload, putFile, removeFile, storageKey } from '@/lib/storage';
 import { pushTracking, shopifyConfigured } from '@/lib/shopify';
 import { notifyHQ } from '@/lib/notify';
 import { dayTime } from '@/lib/format';
@@ -97,6 +98,25 @@ export async function uploadOrderFile(orderId: string, _p: Res, fd: FormData): P
   await db.insert(schema.orderFiles).values({ orderId: o.id, kind, storageKey: key, filename: file.name, mime: file.type, size: file.size, uploadedById: u.id });
   await logEvent({ orderId: o.id, userId: u.id, actor: actorLabel(u), text: `Uploaded: ${KIND_LABEL[kind]}` });
   return done('Uploaded');
+}
+
+/** Removes a proof photo or document from an order (e.g. wrong or blurry photo). Logged in the history. */
+export async function deleteOrderFile(orderId: string, fileId: string): Promise<Res> {
+  const r = await load(orderId); if ('error' in r) return r;
+  const { u, o } = r;
+  const [f] = await db.select().from(schema.orderFiles).where(and(eq(schema.orderFiles.id, fileId), eq(schema.orderFiles.orderId, o.id)));
+  if (!f) return { error: 'That file was already removed.' };
+  const allowed = u.role === 'HQ' ? HQ_ORDER_KINDS : FOUNDRY_KINDS;
+  if (!allowed.includes(f.kind)) return { error: 'This file can’t be removed here.' };
+  if (u.role === 'FOUNDRY' && ['SHIPPED', 'DELIVERED'].includes(o.stage)) return { error: 'This order has shipped, so its photos are kept as the record. Ask Potties HQ if one must go.' };
+  await db.delete(schema.orderFiles).where(eq(schema.orderFiles.id, f.id));
+  try { await removeFile(f.storageKey); } catch { /* the record is gone; a leftover stored file is harmless */ }
+  // A changed set of photos needs a fresh look from HQ.
+  const isProof = f.kind.startsWith('PHOTO_');
+  if (isProof && o.proofApprovedAt) await touch(o.id, { proofApprovedAt: null });
+  await logEvent({ orderId: o.id, userId: u.id, actor: actorLabel(u),
+    text: `Removed: ${KIND_LABEL[f.kind]} (${f.filename})${isProof && o.proofApprovedAt ? '. Proof needs approving again' : ''}` });
+  return done('Removed');
 }
 
 export async function addNote(orderId: string, _p: Res, fd: FormData): Promise<Res> {

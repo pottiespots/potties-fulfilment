@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 // Supabase Storage (private bucket) in production; local ./.data/uploads in development.
@@ -51,4 +51,16 @@ export async function getFile(key: string): Promise<{ url: string } | { data: Bu
 export function storageKey(prefix: string, filename: string) {
   const safe = filename.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80) || 'file';
   return `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+}
+
+/** Deletes a stored file. Missing files are ignored. */
+export async function removeFile(key: string) {
+  if (!key) return;
+  const sb = supabase();
+  if (sb) {
+    const { error } = await sb.storage.from(bucket).remove([key]);
+    if (error) throw new Error(`Could not delete the file: ${error.message}`);
+    return;
+  }
+  await rm(path.join(localRoot, key), { force: true });
 }

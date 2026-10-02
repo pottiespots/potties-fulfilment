@@ -5,7 +5,7 @@ import { getOrder, gateInput } from '@/lib/data';
 import { FOUNDRY_LABEL, FOUNDRY_SETTABLE, canAddTracking, packedBlockers, money } from '@/lib/rules';
 import { dayTime } from '@/lib/format';
 import { KIND_LABEL, PHOTO_SLOTS, COURIERS, NOTE_PRESETS } from '@/lib/labels';
-import { acceptOrder, askQuestion, setFoundryStage, setCheck, uploadOrderFile, addNote, addTracking } from '@/app/actions/orders';
+import { acceptOrder, askQuestion, setFoundryStage, setCheck, uploadOrderFile, addNote, addTracking, deleteOrderFile } from '@/app/actions/orders';
 import { ShipTo, Timeline, addressText, Pill, Checklist } from '@/components/ui';
 import { foundryChecklist, foundryComplete } from '@/lib/checklist';
 import { ActButton, ActForm, CheckToggle, CopyButton, NoteBox, Submit, UploadSlot } from '@/components/client';
@@ -124,7 +124,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
                 previewUrl={latest && latest.mime.startsWith('image/') ? `/api/files/${latest.id}` : null} disabled={o.stage === 'SHIPPED' || o.stage === 'DELIVERED'} />;
             })}
           </div>
-          <FileThumbs files={o.files.filter((f) => f.kind.startsWith('PHOTO_') || f.kind === 'OTHER')} />
+          <FileThumbs files={o.files.filter((f) => f.kind.startsWith('PHOTO_') || f.kind === 'OTHER')} remove={!['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(o.stage) ? deleteOrderFile.bind(null, o.id) : undefined} />
         </section>
 
         <section className={`sec ${o.stage === 'PACKED' ? 'action' : ''}`} id="tracking">

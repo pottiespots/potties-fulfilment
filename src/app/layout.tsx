@@ -17,7 +17,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="ver">Version {process.env.APP_VERSION} · updated {new Date(process.env.APP_BUILT_AT ?? Date.now()).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</footer>
+      </body>
     </html>
   );
 }

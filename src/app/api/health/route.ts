@@ -22,6 +22,8 @@ function explain(err: unknown): string {
 
 export async function GET() {
   const out: Record<string, unknown> = {
+    version: process.env.APP_VERSION,
+    builtAt: process.env.APP_BUILT_AT,
     serverRegion: process.env.AWS_REGION ?? 'unknown',
     databaseSettingPresent: Boolean(process.env.DATABASE_URL),
     databaseIsPooler: /pooler\.supabase\.com:6543/.test(process.env.DATABASE_URL ?? ''),

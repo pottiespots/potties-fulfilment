@@ -6,7 +6,7 @@ import { STAGES, STAGE_LABEL, isOpen, money } from '@/lib/rules';
 import { dayTime, toLocalInput } from '@/lib/format';
 import { KIND_LABEL, PHOTO_SLOTS, COURIERS } from '@/lib/labels';
 import { adminUrl } from '@/lib/shopify';
-import { uploadOrderFile, addNote, addTracking } from '@/app/actions/orders';
+import { uploadOrderFile, addNote, addTracking, deleteOrderFile } from '@/app/actions/orders';
 import {
   sendToFoundry, chaseFoundry, approveProof, requestRetake, answerQuestion, changeShipBy, editAddress, resetAddress, hqSetStage, markDelivered, createInvoice, markInvoicePaid, uploadPop,
 } from '@/app/actions/hq';
@@ -199,7 +199,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
               return <UploadSlot key={k} action={upload} kind={k} label={KIND_LABEL[k]} filled={!!latest} previewUrl={latest && latest.mime.startsWith('image/') ? `/api/files/${latest.id}` : null} />;
             })}
           </div>
-          <FileThumbs files={o.files.filter((f) => f.kind.startsWith('PHOTO_') || f.kind === 'OTHER')} />
+          <FileThumbs files={o.files.filter((f) => f.kind.startsWith('PHOTO_') || f.kind === 'OTHER')} remove={deleteOrderFile.bind(null, o.id)} />
         </section>
 
         <section className="sec" id="tracking">

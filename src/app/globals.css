@@ -375,7 +375,7 @@ form.inline{display:inline-flex}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px}
 .thumbs a{display:block;aspect-ratio:4/3;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--bg);position:relative;font-size:11px;color:var(--muted);text-decoration:none}
 .thumbs img{width:100%;height:100%;object-fit:cover}
-.thumbs span{position:absolute;left:4px;bottom:4px;background:var(--surface);border-radius:4px;padding:0 5px}
+.thumbs a>span{position:absolute;left:4px;bottom:4px;background:var(--surface);border-radius:4px;padding:0 5px}
 .thumbs .pdf{display:grid;place-items:center;height:100%;font-weight:700}
 .empty-state{text-align:center;padding:40px 16px;color:var(--muted)}
 details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
@@ -481,3 +481,11 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
 :root.dark .todo-list .who-foundry{color:var(--ember)}
 .todo-list li.missed .dot{border-color:var(--warn);border-style:dashed}
 .todo-list li.missed .txt small{color:var(--warn);font-weight:600}
+.thumbs .thumb{display:flex;flex-direction:column;gap:4px}
+.thumb-del{border:1px solid var(--line);background:var(--surface);color:var(--bad);border-radius:6px;padding:4px 6px;font-size:12px;font-weight:600;cursor:pointer}
+.thumb-del:hover{border-color:var(--bad);background:var(--bad-bg)}
+.thumbs .thumb .flash{font-size:11px;padding:4px 6px}
+footer.ver{text-align:center;font-size:11px;color:var(--faint);padding:10px 16px 18px}
+.thumb .btns{display:flex;flex-direction:column;align-items:stretch;gap:4px}
+.thumb .btns .kv{font-size:11px;color:var(--bad);font-weight:600;text-align:center}
+.thumb .btns button{width:100%;padding:4px 6px;font-size:12px}

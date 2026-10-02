@@ -134,7 +134,7 @@ Shopify doesn't let other apps download its packing slip PDF. So the dashboard b
 
   The **Sales & cash** tab adds sales per day, cash in by payment method, sales channels, best sellers and site visits. You can switch between 7 days, 30 days and this month, and the **Shopify ↗** buttons open the matching page in Shopify admin. Sales figures come from Shopify orders and refresh every 15 minutes. Shopify only shares the last 60 days of orders with apps.
 - Below that, the Dashboard lists everything that needs you, each with a button to act. Use the tabs to see only **Orders** (new orders to send, foundry questions, late orders, proof to approve), only **Invoices** (overdue and unpaid invoices, missing proofs of payment, next payments) or only **LL & stock** (late LL deliveries, low stock).
-- **The foundry** starts on **My orders**, sorted by ship-by date. They tap an order to accept it, change its status, upload photos, download the packing slip and add tracking. The **Deadlines** tab shows a two-week timeline. Tap a number at the top (New, Late, Ship in 3 days, Waiting for tracking) to see only those orders. Each order has a **To do** list on the right showing what's done and what's next. HQ sees the same list on its order page, with HQ and Foundry steps marked, through to delivery. Once the courier collects and tracking is added, the order is complete for the foundry.
+- **The foundry** starts on **My orders**, sorted by ship-by date. They tap an order to accept it, change its status, upload photos, download the packing slip and add tracking. The **Deadlines** tab shows a two-week timeline. Tap a number at the top (New, Late, Ship in 3 days, Waiting for tracking) to see only those orders. Each order has a **To do** list on the right showing what's done and what's next. HQ sees the same list on its order page, with HQ and Foundry steps marked, through to delivery. Once the courier collects and tracking is added, the order is complete for the foundry. A wrong or blurry photo can be taken off with **Remove** under it, until the order has shipped. Removals are recorded in the history, and HQ must approve the proof again if it was already approved.
 - **Changing a shipping address**: on the order, open **Change shipping address**, fix it and save. The packing slip shows the new address straight away, and the Drive copy is remade on the next hourly sync. If the order is already with the foundry, they get an email and a warning on the order to use the new slip. Shopify syncs then leave your address alone; **Use Shopify address again** undoes it. This changes the Order Desk only, not the address in Shopify.
 - **Invoices**: attach the foundry’s Xero invoice on the order screen and LL’s invoice on its purchase order. Then mark it paid and upload the proof of payment. The **Invoices** tab shows what’s still owed to each supplier.
 
@@ -143,6 +143,10 @@ Shopify doesn't let other apps download its packing slip PDF. So the dashboard b
 - **Automatic import of Xero invoices from Gmail.** For now, invoices are attached by hand: upload the PDF on the order or purchase order. Automatic import needs a Google Cloud app with Gmail access.
 - Users can’t reset their own password yet. HQ sets new passwords on the **Logins** page.
 - Deliveries are marked delivered automatically when Shopify receives courier tracking updates. Not every South African courier reports deliveries to Shopify, so HQ can also press **Mark delivered**.
+
+## Which version is live?
+
+Every page shows **Version abc1234 · updated …** at the bottom, and so does `/api/health`. The number matches the latest commit on GitHub. If it doesn't, the newest update hasn't been deployed: check **Netlify → Deploys**.
 
 ## Local development
 
