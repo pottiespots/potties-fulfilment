@@ -11,7 +11,7 @@ import { STAGE_LABEL, STAGES, money } from '@/lib/rules';
 import { dayTime, fromLocalInput } from '@/lib/format';
 import { notifyFoundry, sendEmail } from '@/lib/notify';
 import { checkUpload, putFile, storageKey } from '@/lib/storage';
-import { syncRecentOrders, shopifyConfigured, addressFromShopify } from '@/lib/shopify';
+import { syncRecentOrders, shopifyConfigured, addressFromShopify, checkTrackingEmail } from '@/lib/shopify';
 import type { Res } from './orders';
 
 async function requireHQ(): Promise<User> {
@@ -129,6 +129,20 @@ export async function resetAddress(orderId: string): Promise<Res> {
   const o = await getOrder(orderId, 'HQ');
   if (!o?.shopifyData?.shippingAddress) return { error: 'No Shopify address stored for this order. Press Sync Shopify first.' };
   return applyAddress(u, orderId, addressFromShopify(o.shopifyData.shippingAddress, o.shopifyData.note ?? null), false, '');
+}
+
+/** Asks Shopify again whether the customer got their tracking email. */
+export async function recheckTrackingEmail(orderId: string): Promise<Res> {
+  await requireHQ();
+  const o = await getOrder(orderId, 'HQ');
+  if (!o?.shopifyId || !o.shopifyFulfillmentId) return { error: 'This order has no tracking in Shopify yet.' };
+  try {
+    const st = await checkTrackingEmail(o.shopifyId);
+    await touch(orderId, { trackingEmailStatus: st, trackingEmailCheckedAt: new Date() });
+    return done(st === 'sent' ? 'Shopify confirms the tracking email was sent.' : st === 'no_email' ? 'Shopify still has no email address for this customer.' : 'Shopify was asked to email, but has not confirmed it yet.');
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
 }
 
 /** Manual correction: HQ can put an order in any stage (logged). */

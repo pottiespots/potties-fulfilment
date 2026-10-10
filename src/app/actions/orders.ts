@@ -10,7 +10,7 @@ import type { FileKind, User } from '@/lib/db/schema';
 import { canAddTracking, canSetFoundryStage, FOUNDRY_LABEL } from '@/lib/rules';
 import { KIND_LABEL } from '@/lib/labels';
 import { checkUpload, putFile, removeFile, storageKey } from '@/lib/storage';
-import { pushTracking, shopifyConfigured } from '@/lib/shopify';
+import { checkTrackingEmail, pushTracking, shopifyConfigured, type TrackingEmailStatus } from '@/lib/shopify';
 import { notifyHQ } from '@/lib/notify';
 import { dayTime } from '@/lib/format';
 
@@ -141,23 +141,29 @@ export async function addTracking(orderId: string, _p: Res, fd: FormData): Promi
   const check = canAddTracking(gateInput(o), process.env.REQUIRE_HQ_PROOF_APPROVAL === 'true');
   if (!check.ok) return { error: check.reason };
 
-  let fulfillmentId: string | null = null, syncError: string | null = null;
+  let fulfillmentId: string | null = null, syncError: string | null = null, emailStatus: TrackingEmailStatus | null = null;
   if (o.shopifyId && shopifyConfigured()) {
     try { fulfillmentId = await pushTracking(o.shopifyId, company, number); }
     catch (e) { syncError = (e as Error).message; }
+    if (fulfillmentId) { try { emailStatus = await checkTrackingEmail(o.shopifyId); } catch { emailStatus = 'requested'; } }
   } else if (o.shopifyId) {
     syncError = 'Shopify is not connected yet.';
   }
   await touch(o.id, {
     stage: 'SHIPPED', shippedAt: new Date(), trackingCompany: company, trackingNumber: number, courier: company,
     shopifyFulfillmentId: fulfillmentId, shopifySyncError: syncError,
+    trackingEmailStatus: emailStatus, trackingEmailCheckedAt: emailStatus ? new Date() : null,
   });
   await logEvent({ orderId: o.id, userId: u.id, actor: actorLabel(u), kind: 'status',
-    text: `Collected by ${company}. Tracking ${number}${fulfillmentId ? ' sent to Shopify, customer notified' : ''}` });
+    text: `Collected by ${company}. Tracking ${number}${fulfillmentId ? ' sent to Shopify' : ''}` });
+  if (emailStatus === 'no_email') {
+    await logEvent({ orderId: o.id, actor: 'Shopify', text: 'No email address on this Shopify order, so the customer was not emailed their tracking.', internal: true });
+    await notifyHQ(`${o.name}: customer has no email for tracking`, `Shopify has no email address for ${o.customerName}, so they did not get the tracking email.\nTracking: ${company} ${number}${o.phone ? `\nPhone: ${o.phone}` : ''}`, `/hq/orders/${o.id}`);
+  }
   if (syncError) {
     await logEvent({ orderId: o.id, actor: 'Shopify', text: `Tracking not sent to Shopify: ${syncError}`, internal: true });
     await notifyHQ(`Tracking for ${o.name} did not reach Shopify`, `${syncError}\nTracking: ${company} ${number}`, `/hq/orders/${o.id}`);
   }
-  return done(fulfillmentId ? 'Tracking sent. The customer has been emailed.' : 'Tracking saved');
+  return done(!fulfillmentId ? 'Tracking saved' : emailStatus === 'no_email' ? 'Tracking sent to Shopify. The customer has no email address, so Potties HQ will let them know.' : 'Tracking sent to Shopify. The customer is emailed their tracking.');
 }
 

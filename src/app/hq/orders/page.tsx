@@ -8,6 +8,7 @@ import { LeftPill, Pill } from '@/components/ui';
 import { FilterBox, LinkSelect, TrackingLink } from '@/components/client';
 import type { Stage } from '@/lib/db/schema';
 import { trackingUrl } from '@/lib/labels';
+import { NoticePill } from '@/components/tracking';
 
 export const metadata = { title: 'Foundry orders · Potties' };
 
@@ -103,7 +104,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
                     <td>{STAGE_LABEL[o.stage]}{o.openQuestion && <> <Pill tone="bad">Question</Pill></>}
                       <div className="prog">{STAGES.map((s, j) => <i key={s} className={j < stageIndex(o.stage) ? 'd' : j === stageIndex(o.stage) ? 'c' : ''} />)}</div></td>
                     <td>{customPill(o)}</td><td>{proofPill(o)}</td>
-                    <td>{o.trackingNumber ? <TrackingLink number={o.trackingNumber} url={trackingUrl(o.trackingCompany, o.trackingNumber)} /> : o.stage === 'PACKED' ? <Pill tone="warn">Waiting</Pill> : <span className="sub2">—</span>}</td>
+                    <td>{o.trackingNumber ? <><TrackingLink number={o.trackingNumber} url={trackingUrl(o.trackingCompany, o.trackingNumber)} />{(o.stage === 'SHIPPED' || o.stage === 'DELIVERED') && <><br /><NoticePill o={o} /></>}</> : o.stage === 'PACKED' ? <Pill tone="warn">Waiting</Pill> : <span className="sub2">—</span>}</td>
                     <td>{invPill(o)}</td>
                   </tr>
                 );

@@ -61,6 +61,9 @@ export const orders = pgTable('orders', {
   trackingCompany: text('tracking_company'),
   shopifyFulfillmentId: text('shopify_fulfillment_id'),
   shopifySyncError: text('shopify_sync_error'),
+  // Did Shopify email the customer their tracking? 'sent' | 'requested' (asked, not confirmed yet) | 'no_email'
+  trackingEmailStatus: text('tracking_email_status'),
+  trackingEmailCheckedAt: ts('tracking_email_checked_at'),
   hqCustomChecked: boolean('hq_custom_checked').notNull().default(false),
   foundryCustomChecked: boolean('foundry_custom_checked').notNull().default(false),
   slipInBox: boolean('slip_in_box').notNull().default(false),

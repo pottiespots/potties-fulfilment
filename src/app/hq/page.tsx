@@ -24,7 +24,7 @@ function Actions({ a }: { a: Attention }) {
     case 'not-accepted': case 'late': case 'custom-unchecked':
       return <><ActButton className="btn ghost sm" action={chaseFoundry.bind(null, a.orderId!)}>{a.kind === 'custom-unchecked' ? 'Remind foundry' : 'Chase foundry'}</ActButton><Link className="btn ghost sm" href={open}>Open</Link></>;
     case 'proof': return <><Link className="btn ghost sm" href={open}>View photos</Link><ActButton className="btn sm" action={approveProof.bind(null, a.orderId!)}>Approve</ActButton></>;
-    case 'tracking-failed': return <Link className="btn sm" href={open}>Open</Link>;
+    case 'tracking-failed': case 'customer-not-emailed': return <Link className="btn sm" href={open}>{a.kind === 'customer-not-emailed' ? 'Send tracking' : 'Open'}</Link>;
     case 'invoice-overdue': case 'invoice-due': return <ActButton className={`btn ${a.kind === 'invoice-overdue' ? '' : 'ghost'} sm`} action={markInvoicePaid.bind(null, a.invoiceId!)}>Mark paid</ActButton>;
     case 'pop-missing': return <Link className="btn ghost sm" href="/hq/invoices">Upload POP</Link>;
     case 'po-late': return <Link className="btn ghost sm" href="/hq/ll">Open LL orders</Link>;

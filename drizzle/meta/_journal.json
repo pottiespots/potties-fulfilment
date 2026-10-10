@@ -36,6 +36,13 @@
       "when": 1790937768021,
       "tag": "0004_cash_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791614539066,
+      "tag": "0005_tracking_email",
+      "breakpoints": true
     }
   ]
 }

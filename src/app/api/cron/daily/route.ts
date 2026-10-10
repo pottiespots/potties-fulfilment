@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { notifyFoundry, notifyHQ } from '@/lib/notify';
 import { acceptDeadline, timeLeftLabel } from '@/lib/rules';
-import { shopifyConfigured, syncRecentOrders } from '@/lib/shopify';
+import { checkTrackingEmail, shopifyConfigured, syncRecentOrders } from '@/lib/shopify';
 import { refreshLedger } from '@/lib/shopify-insights';
 
 // Runs every morning (vercel.json). Catches orders missed by webhooks and emails a summary of
@@ -17,6 +17,11 @@ export async function GET(req: Request) {
   if (shopifyConfigured()) {
     try { synced = await syncRecentOrders(14); } catch (e) { console.error('[cron sync]', e); }
     try { await refreshLedger(true); } catch (e) { console.error('[cron ledger]', e); }
+    // Confirm tracking emails Shopify had not confirmed yet (orders shipped in the last 2 weeks).
+    const unconfirmed = await db.select().from(schema.orders).where(and(eq(schema.orders.stage, 'SHIPPED'), eq(schema.orders.trackingEmailStatus, 'requested'), gte(schema.orders.shippedAt, new Date(now.getTime() - 14 * 864e5))));
+    for (const o of unconfirmed) {
+      try { await db.update(schema.orders).set({ trackingEmailStatus: await checkTrackingEmail(o.shopifyId!), trackingEmailCheckedAt: new Date() }).where(eq(schema.orders.id, o.id)); } catch (e) { console.error('[cron tracking email]', o.name, e); }
+    }
   }
   const open = await db.select().from(schema.orders)
     .where(inArray(schema.orders.stage, ['SENT', 'ACCEPTED', 'MANUFACTURING', 'PACKING', 'PACKED']));

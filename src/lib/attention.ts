@@ -5,14 +5,14 @@ import { acceptDeadline, duration, HOUR, isOpen, money, STAGE_LABEL, stillOwed }
 import { day } from './format';
 
 export type AttentionKind =
-  | 'send' | 'question' | 'not-accepted' | 'late' | 'proof' | 'custom-unchecked' | 'tracking-failed'
+  | 'send' | 'question' | 'not-accepted' | 'late' | 'proof' | 'custom-unchecked' | 'tracking-failed' | 'customer-not-emailed'
   | 'invoice-overdue' | 'invoice-due' | 'pop-missing' | 'po-late' | 'low-stock';
 
 export type AttentionGroup = 'orders' | 'invoices' | 'stock';
 
 /** Which Dashboard tab each kind of item belongs to. */
 export const ATTENTION_GROUP: Record<AttentionKind, AttentionGroup> = {
-  send: 'orders', question: 'orders', 'not-accepted': 'orders', late: 'orders', proof: 'orders', 'custom-unchecked': 'orders', 'tracking-failed': 'orders',
+  send: 'orders', question: 'orders', 'not-accepted': 'orders', late: 'orders', proof: 'orders', 'custom-unchecked': 'orders', 'tracking-failed': 'orders', 'customer-not-emailed': 'orders',
   'invoice-overdue': 'invoices', 'invoice-due': 'invoices', 'pop-missing': 'invoices',
   'po-late': 'stock', 'low-stock': 'stock',
 };
@@ -51,6 +51,7 @@ export function buildAttention(input: {
     if (custom && isOpen(o.stage) && ['ACCEPTED', 'MANUFACTURING', 'PACKING'].includes(o.stage) && !o.foundryCustomChecked && left(o.shipBy) >= 0 && left(o.shipBy) < 48 * HOUR)
       A.push({ ...base, sev: 'warn', kind: 'custom-unchecked', title: 'Customisation not confirmed yet', detail: `Ships in ${duration(left(o.shipBy))} · “${custom.customText}”` });
     if (o.shopifySyncError && o.stage === 'SHIPPED' && !o.shopifyFulfillmentId) A.push({ ...base, sev: 'bad', kind: 'tracking-failed', title: 'Tracking did not reach Shopify', detail: o.shopifySyncError });
+    if (o.stage === 'SHIPPED' && o.shopifyFulfillmentId && o.trackingEmailStatus === 'no_email') A.push({ ...base, sev: 'warn', kind: 'customer-not-emailed', title: 'Customer did not get a tracking email', detail: `No email address on the Shopify order · ${o.trackingCompany ?? ''} ${o.trackingNumber ?? ''}${o.phone ? ` · send it to ${o.phone}` : ''}` });
   }
   const part = (i: InvoiceRow) => (i.paidAmountCents ? ` · ${money(i.paidAmountCents)} of ${money(i.amountCents)} already paid` : '');
   for (const i of invoices) {

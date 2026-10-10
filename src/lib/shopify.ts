@@ -226,3 +226,22 @@ export async function getShopInfo(): Promise<ShopInfo> {
     return fallback;
   }
 }
+
+export type TrackingEmailStatus = 'sent' | 'requested' | 'no_email';
+/**
+ * Asks Shopify whether the customer was emailed their tracking. Shopify only emails customers with a valid
+ * email address (canNotifyCustomer); a shipping-confirmation entry in the order's history confirms it was sent.
+ */
+export async function checkTrackingEmail(shopifyOrderId: string): Promise<TrackingEmailStatus> {
+  const base = await gql<{ order: { canNotifyCustomer: boolean } | null }>(`query($id: ID!) { order(id: $id) { canNotifyCustomer } }`, { id: shopifyOrderId });
+  if (!base.order) throw new Error('Order not found in Shopify');
+  if (!base.order.canNotifyCustomer) return 'no_email';
+  try {
+    const ev = await gql<{ order: { events: { nodes: { message: string }[] } } }>(
+      `query($id: ID!) { order(id: $id) { events(first: 30, reverse: true) { nodes { message } } } }`, { id: shopifyOrderId });
+    const sent = ev.order.events.nodes.some((e) => /e-?mail|notification/i.test(e.message) && /ship|fulfil|tracking/i.test(e.message) && !/fail|not sent|bounced/i.test(e.message));
+    return sent ? 'sent' : 'requested';
+  } catch {
+    return 'requested'; // history not readable with this app's access; Shopify was still asked to email
+  }
+}

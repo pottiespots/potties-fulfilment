@@ -513,3 +513,8 @@ ul.notes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:gr
 .trk-a{color:var(--ember-deep);font-weight:600;text-decoration:underline;text-underline-offset:2px;background:none;border:0;padding:0;cursor:pointer;font-size:inherit}
 :root.dark .trk-a{color:var(--ember)}
 .trk-note{font-size:11px;color:var(--ok);font-weight:600}
+.cnote{margin-top:10px;border-radius:8px;padding:10px 12px;font-size:14px}
+.cnote.ok{background:var(--ok-bg);color:var(--ok)}
+.cnote.info{background:var(--info-bg);color:var(--info)}
+.cnote.warn{background:var(--warn-bg);color:var(--fg);border-left:4px solid var(--warn)}
+.cnote.bad{background:var(--bad-bg);color:var(--fg);border-left:4px solid var(--bad)}

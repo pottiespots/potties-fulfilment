@@ -130,7 +130,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         <section className={`sec ${o.stage === 'PACKED' ? 'action' : ''}`} id="tracking">
           <h4>Tracking number</h4>
           {o.trackingNumber ? (
-            <div className="sent-ok">{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} /><br />{o.shopifyFulfillmentId ? 'Sent to Shopify. The customer has their tracking link.' : 'Saved. Potties HQ will make sure the customer gets it.'}</div>
+            <div className="sent-ok">{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} /><br />{!o.shopifyFulfillmentId ? 'Saved. Potties HQ will make sure the customer gets it.' : o.trackingEmailStatus === 'no_email' ? 'Sent to Shopify. The customer has no email address, so Potties HQ will send them the tracking.' : o.trackingEmailStatus === 'sent' ? 'Sent to Shopify. The customer has been emailed their tracking.' : 'Sent to Shopify. Shopify emails the customer their tracking.'}</div>
           ) : track.ok ? (
             <ActForm action={addTracking.bind(null, o.id)}>
               <p style={{ margin: '0 0 10px', fontSize: 14 }}>When the courier collects, type the waybill number. It goes straight to Shopify and the customer gets a tracking email.</p>

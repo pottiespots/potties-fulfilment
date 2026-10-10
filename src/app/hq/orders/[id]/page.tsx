@@ -14,6 +14,7 @@ import { ShipTo, Stepper, Timeline, addressText, Pill, Checklist } from '@/compo
 import { hqChecklist } from '@/lib/checklist';
 import { ActButton, ActForm, CopyButton, NoteBox, Submit, UploadSlot, TrackingLink } from '@/components/client';
 import { FileThumbs } from '@/components/files';
+import { CustomerNoticeHQ } from '@/components/tracking';
 
 export default async function HQOrder({ params }: { params: Promise<{ id: string }> }) {
   await requireRole('HQ');
@@ -206,7 +207,10 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
         <section className="sec" id="tracking">
           <h4>Tracking</h4>
           {o.trackingNumber ? (
-            <div className="sent-ok">{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} /> · {o.shopifyFulfillmentId ? 'sent to Shopify, customer notified' : 'saved here only'}</div>
+            <>
+              <div className="sent-ok">{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} /> · {o.shopifyFulfillmentId ? 'sent to Shopify' : 'saved here only'}</div>
+              <CustomerNoticeHQ o={o} />
+            </>
           ) : o.stage === 'PACKED' ? (
             <ActForm action={addTracking.bind(null, o.id)}>
               <p className="kv" style={{ margin: '0 0 8px' }}>The foundry adds this on collection. You can add it here if they email it to you.</p>

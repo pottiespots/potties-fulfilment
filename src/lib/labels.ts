@@ -19,3 +19,17 @@ export function trackingUrl(company: string | null | undefined, number: string):
   if (/courier ?guy|tcg/i.test(company ?? '') || /^TCG/i.test(number)) return `https://thecourierguy.co.za/tracking/?waybill=${encodeURIComponent(number)}`;
   return null;
 }
+
+/** Phone number in international form for WhatsApp / SMS links (South African 0xx numbers become 27xx). */
+export function intlPhone(phone: string | null | undefined): string | null {
+  const d = (phone ?? '').replace(/[^\d+]/g, '');
+  if (!d) return null;
+  if (d.startsWith('+')) return d.slice(1);
+  if (d.startsWith('00')) return d.slice(2);
+  if (d.startsWith('0') && d.length === 10) return `27${d.slice(1)}`;
+  return d.length >= 9 ? d : null;
+}
+export function trackingMessage(o: { name: string; customerName: string; trackingCompany: string | null; trackingNumber: string | null }) {
+  const url = o.trackingNumber ? trackingUrl(o.trackingCompany, o.trackingNumber) : null;
+  return `Hi ${o.customerName.split(' ')[0]}, your Potties order ${o.name} is on its way with ${o.trackingCompany ?? 'the courier'}. Tracking number: ${o.trackingNumber}.${url ? ` Track it here: https://thecourierguy.co.za/tracking/` : ''}`;
+}
