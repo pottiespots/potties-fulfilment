@@ -13,3 +13,9 @@ export const supplierName = (supplier: string, label?: string | null) =>
 export const PHOTO_SLOTS: FileKind[] = ['PHOTO_PRODUCT', 'PHOTO_CUSTOM', 'PHOTO_PACKED', 'PHOTO_WAYBILL'];
 export const COURIERS = ['The Courier Guy', 'Aramex', 'Pargo', 'PostNet', 'Fastway', 'DSV', 'Other'];
 export const NOTE_PRESETS = ['Mould ready', 'Poured today', 'Cooling / fettling', 'Seasoned', 'Waiting on materials', 'Problem / delay: ', 'Courier booked'];
+
+/** Courier's own tracking page for a waybill, when we know it. The number is also copied when the link is clicked. */
+export function trackingUrl(company: string | null | undefined, number: string): string | null {
+  if (/courier ?guy|tcg/i.test(company ?? '') || /^TCG/i.test(number)) return `https://thecourierguy.co.za/tracking/?waybill=${encodeURIComponent(number)}`;
+  return null;
+}

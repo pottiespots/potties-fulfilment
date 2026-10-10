@@ -210,3 +210,19 @@ export function LinkSelect({ label, value, options }: { label: string; value: st
     </label>
   );
 }
+
+/** Tracking number that opens the courier's tracking page and copies the number, so it can be pasted if the page doesn't fill it in. */
+export function TrackingLink({ number, url }: { number: string; url: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(number); setCopied(true); setTimeout(() => setCopied(false), 6000); } catch { /* copying is a convenience only */ }
+  };
+  return (
+    <span className="trk">
+      {url
+        ? <a className="mono trk-a" href={url} target="_blank" rel="noreferrer" onClick={copy} title="Open the courier's tracking page (number copied)">{number} ↗</a>
+        : <button type="button" className="mono trk-a" onClick={copy} title="Copy tracking number">{number}</button>}
+      {copied && <span className="trk-note" role="status">{url ? 'Number copied: paste it on the tracking page if it isn’t filled in' : 'Copied'}</span>}
+    </span>
+  );
+}

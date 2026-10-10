@@ -4,11 +4,11 @@ import { requireRole } from '@/lib/auth';
 import { getOrder, gateInput } from '@/lib/data';
 import { FOUNDRY_LABEL, FOUNDRY_SETTABLE, canAddTracking, packedBlockers, money, invoiceStatus } from '@/lib/rules';
 import { dayTime, day } from '@/lib/format';
-import { KIND_LABEL, PHOTO_SLOTS, COURIERS, NOTE_PRESETS } from '@/lib/labels';
+import { KIND_LABEL, PHOTO_SLOTS, COURIERS, NOTE_PRESETS, trackingUrl } from '@/lib/labels';
 import { acceptOrder, askQuestion, setFoundryStage, setCheck, uploadOrderFile, addNote, addTracking, deleteOrderFile } from '@/app/actions/orders';
 import { ShipTo, Timeline, addressText, Pill, Checklist } from '@/components/ui';
 import { foundryChecklist, foundryComplete } from '@/lib/checklist';
-import { ActButton, ActForm, CheckToggle, CopyButton, NoteBox, Submit, UploadSlot } from '@/components/client';
+import { ActButton, ActForm, CheckToggle, CopyButton, NoteBox, Submit, UploadSlot, TrackingLink } from '@/components/client';
 import { FileThumbs } from '@/components/files';
 
 const STEP_HINT: Record<string, string> = { ACCEPTED: 'Order confirmed', MANUFACTURING: 'Casting & finishing', PACKING: 'Boxing it up', PACKED: 'Ready for courier' };
@@ -130,7 +130,7 @@ export default async function FoundryOrder({ params }: { params: Promise<{ id: s
         <section className={`sec ${o.stage === 'PACKED' ? 'action' : ''}`} id="tracking">
           <h4>Tracking number</h4>
           {o.trackingNumber ? (
-            <div className="sent-ok">{o.trackingCompany} · <span className="mono">{o.trackingNumber}</span><br />{o.shopifyFulfillmentId ? 'Sent to Shopify. The customer has their tracking link.' : 'Saved. Potties HQ will make sure the customer gets it.'}</div>
+            <div className="sent-ok">{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} /><br />{o.shopifyFulfillmentId ? 'Sent to Shopify. The customer has their tracking link.' : 'Saved. Potties HQ will make sure the customer gets it.'}</div>
           ) : track.ok ? (
             <ActForm action={addTracking.bind(null, o.id)}>
               <p style={{ margin: '0 0 10px', fontSize: 14 }}>When the courier collects, type the waybill number. It goes straight to Shopify and the customer gets a tracking email.</p>

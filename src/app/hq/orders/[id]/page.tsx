@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth';
 import { getOrder, gateInput } from '@/lib/data';
 import { STAGES, STAGE_LABEL, isOpen, money } from '@/lib/rules';
 import { dayTime, toLocalInput } from '@/lib/format';
-import { KIND_LABEL, PHOTO_SLOTS, COURIERS } from '@/lib/labels';
+import { KIND_LABEL, PHOTO_SLOTS, COURIERS, trackingUrl } from '@/lib/labels';
 import { adminUrl } from '@/lib/shopify';
 import { uploadOrderFile, addNote, addTracking, deleteOrderFile } from '@/app/actions/orders';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/app/actions/hq';
 import { ShipTo, Stepper, Timeline, addressText, Pill, Checklist } from '@/components/ui';
 import { hqChecklist } from '@/lib/checklist';
-import { ActButton, ActForm, CopyButton, NoteBox, Submit, UploadSlot } from '@/components/client';
+import { ActButton, ActForm, CopyButton, NoteBox, Submit, UploadSlot, TrackingLink } from '@/components/client';
 import { FileThumbs } from '@/components/files';
 
 export default async function HQOrder({ params }: { params: Promise<{ id: string }> }) {
@@ -92,7 +92,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
     next = (
       <section className="sec action">
         <h4>In transit</h4>
-        <p style={{ margin: '0 0 10px', fontSize: 14 }}>{o.trackingCompany} · <span className="mono">{o.trackingNumber}</span>. Marked delivered automatically when Shopify reports delivery.</p>
+        <p style={{ margin: '0 0 10px', fontSize: 14 }}>{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} />. Marked delivered automatically when Shopify reports delivery.</p>
         <ActButton className="btn ghost" action={markDelivered.bind(null, o.id)} confirm="Mark this order delivered?">Mark delivered</ActButton>
       </section>
     );
@@ -206,7 +206,7 @@ export default async function HQOrder({ params }: { params: Promise<{ id: string
         <section className="sec" id="tracking">
           <h4>Tracking</h4>
           {o.trackingNumber ? (
-            <div className="sent-ok">{o.trackingCompany} · <span className="mono">{o.trackingNumber}</span> · {o.shopifyFulfillmentId ? 'sent to Shopify, customer notified' : 'saved here only'}</div>
+            <div className="sent-ok">{o.trackingCompany} · <TrackingLink number={o.trackingNumber!} url={trackingUrl(o.trackingCompany, o.trackingNumber!)} /> · {o.shopifyFulfillmentId ? 'sent to Shopify, customer notified' : 'saved here only'}</div>
           ) : o.stage === 'PACKED' ? (
             <ActForm action={addTracking.bind(null, o.id)}>
               <p className="kv" style={{ margin: '0 0 8px' }}>The foundry adds this on collection. You can add it here if they email it to you.</p>

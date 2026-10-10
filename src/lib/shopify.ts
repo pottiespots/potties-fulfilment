@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { db, schema } from './db';
 import type { ShopifyAddress, ShopifyOrderData } from './db/schema';
+import { trackingUrl } from './labels';
 import { courierFromShippingTitle, defaultShipBy, detectCustomisation } from './rules';
 import { logEvent } from './data';
 
@@ -177,7 +178,7 @@ export async function pushTracking(shopifyOrderId: string, company: string, numb
   if (!open.length) throw new Error('Shopify has no open fulfilment for this order (already fulfilled?).');
   const res = await gql<{ fulfillmentCreate: { fulfillment: { id: string } | null; userErrors: { message: string }[] } }>(
     `mutation($f: FulfillmentInput!) { fulfillmentCreate(fulfillment: $f) { fulfillment { id } userErrors { message } } }`,
-    { f: { notifyCustomer: true, trackingInfo: { company, number }, lineItemsByFulfillmentOrder: open.map((f) => ({ fulfillmentOrderId: f.id })) } });
+    { f: { notifyCustomer: true, trackingInfo: { company, number, ...(trackingUrl(company, number) ? { url: trackingUrl(company, number) } : {}) }, lineItemsByFulfillmentOrder: open.map((f) => ({ fulfillmentOrderId: f.id })) } });
   if (res.fulfillmentCreate.userErrors.length) throw new Error(res.fulfillmentCreate.userErrors.map((e) => e.message).join('; '));
   return res.fulfillmentCreate.fulfillment!.id;
 }

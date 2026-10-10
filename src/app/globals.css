@@ -509,3 +509,7 @@ ul.notes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:gr
 .paysteps .ps.part .dot{border-color:var(--info);border-style:dashed}
 :root.dark .paysteps .ps.done .dot{color:#1b1916}
 .otbl .r{text-align:right}
+.trk{display:inline-flex;flex-direction:column;gap:2px}
+.trk-a{color:var(--ember-deep);font-weight:600;text-decoration:underline;text-underline-offset:2px;background:none;border:0;padding:0;cursor:pointer;font-size:inherit}
+:root.dark .trk-a{color:var(--ember)}
+.trk-note{font-size:11px;color:var(--ok);font-weight:600}
