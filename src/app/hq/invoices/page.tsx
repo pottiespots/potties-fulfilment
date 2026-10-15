@@ -5,7 +5,7 @@ import { money, stageIndex, stillOwed } from '@/lib/rules';
 import { day } from '@/lib/format';
 import { Pill, Tile } from '@/components/ui';
 import { ActButton, UploadSlot } from '@/components/client';
-import { markInvoicePaid, uploadPop } from '@/app/actions/hq';
+import { markInvoicePaid, removeInvoice, uploadPop } from '@/app/actions/hq';
 import { supplierName } from '@/lib/labels';
 import { SyncStatus } from '@/components/sync-status';
 
@@ -56,6 +56,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                   <td className="r"><div className="btns" style={{ justifyContent: 'flex-end' }}>
                     {!i.paidAt && <ActButton className="btn sm" action={markInvoicePaid.bind(null, i.id)}>Mark paid</ActButton>}
                     {!i.pop && <UploadSlot action={uploadPop.bind(null, i.id)} kind="POP" label="Upload POP" filled={false} />}
+                    <ActButton className="btn ghost sm danger" action={removeInvoice.bind(null, i.id)}
+                      confirm={i.pop ? `Remove ${i.number} and its proof of payment? Only for duplicates or voided invoices.` : `Remove ${i.number}? Only for duplicates or voided invoices.`}>Remove</ActButton>
                   </div></td>
                 </tr>
               );

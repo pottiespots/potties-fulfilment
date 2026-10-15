@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db, schema } from '@/lib/db';
 import { checkIntegrationToken, mapSupplier, toCents, toDate } from '@/lib/integration';
 import { logEvent } from '@/lib/data';
+import { removeInvoices } from '@/lib/invoices';
 
 // POST /api/integration/invoices  — the COGS sheet's "8. Invoices" register, one item per invoice.
 // Creates or updates by (supplier, invoice number). The sheet is in charge of amounts and payments;
@@ -21,7 +22,8 @@ const Item = z.object({
   driveUrl: z.string().url().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
-const Body = z.object({ invoices: z.array(Item).max(500) });
+// `remove`: invoice numbers no longer on the sheet (deleted rows, or Type REMOVE / VOID / SUPERSEDED / QUOTE). They are deleted.
+const Body = z.object({ invoices: z.array(Item).max(500).default([]), remove: z.array(z.string().min(1).max(100)).max(500).optional() });
 
 export async function POST(req: Request) {
   const denied = checkIntegrationToken(req); if (denied) return denied;
@@ -68,5 +70,8 @@ export async function POST(req: Request) {
       if (row.orderId) await logEvent({ orderId: row.orderId, actor: 'COGS sheet', text: `Supplier invoice ${row.number} added from the COGS sheet`, internal: true });
     }
   }
-  return NextResponse.json(result);
+  const removal = parsed.data.remove?.length
+    ? await removeInvoices(parsed.data.remove, 'COGS sheet', { reason: 'no longer on the COGS sheet (8. Invoices)' })
+    : { removed: [], keptWithPop: [], notFound: [] };
+  return NextResponse.json({ ...result, ...removal });
 }

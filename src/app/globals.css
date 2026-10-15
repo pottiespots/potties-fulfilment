@@ -518,3 +518,4 @@ ul.notes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:gr
 .cnote.info{background:var(--info-bg);color:var(--info)}
 .cnote.warn{background:var(--warn-bg);color:var(--fg);border-left:4px solid var(--warn)}
 .cnote.bad{background:var(--bad-bg);color:var(--fg);border-left:4px solid var(--bad)}
+.btn.danger{color:var(--bad)} .btn.danger:hover{border-color:var(--bad);background:var(--bad-bg)}

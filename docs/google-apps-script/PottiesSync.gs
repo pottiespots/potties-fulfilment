@@ -6,6 +6,9 @@
  *  3. Shopify packing slips + dashboard documents -> Drive / Potties / Fulfilment / <order> (slips, photos, POPs)
  *  4. Gmail attachments that mention an order (waybills, artwork) -> Drive, linked on the order
  *  5. Logs each run on the dashboard ("COGS sheet synced ...")
+ *  6. "8. Invoices" is the single source of truth: any dashboard invoice that is not a valid row on the sheet
+ *     (row deleted, or Type starting REMOVE / SUPERSEDED / VOID / QUOTE, or R0) is REMOVED from the dashboard.
+ *     To remove a duplicate: delete its row on 8. Invoices, or type REMOVE in its Type cell.
  *
  * Setup: paste into a new project at script.google.com, set TOKEN, choose "setup" and click Run.
  * Written in plain JavaScript so it runs on any Apps Script runtime.
@@ -52,7 +55,9 @@ function syncAll() {
     var since = new Date(new Date().getTime() - 3 * 86400000).toISOString();
     exp = api('get', '/api/integration/export?since=' + encodeURIComponent(since));
   });
-  step('Invoices', pushInvoices);
+  var validRefs = null;
+  step('Invoices', function () { var r = pushInvoices(); validRefs = r.refs; return r.msg; });
+  if (exp && validRefs) step('Remove invoices not on the sheet', function () { return removeStaleInvoices(exp, validRefs); });
   if (exp) {
     step('Fulfilment tab', function () { return writeFulfilmentTab(exp.orders); });
     step('Documents', function () { return archiveDocuments(exp); });
@@ -126,7 +131,7 @@ function pushInvoices() {
     if (!ref || ref === 'TOTAL') break;
     var type = String(row[col['Type']] || '');
     var total = num(row[col['Total incl VAT']]);
-    if (/QUOTE|SUPERSEDED|REMOVED/i.test(type) || total <= 0) continue;
+    if (isDeadType(type) || total <= 0) continue;
 
     var depositOpen = num(row[col['Deposit amount']]) - num(row[col['Deposit PAID']]) > 0.01;
     var balanceOpen = num(row[col['Balance amount']]) - num(row[col['Balance PAID']]) > 0.01;
@@ -163,11 +168,45 @@ function pushInvoices() {
       notes: noteParts.join(' - ').slice(0, 300)
     });
   }
+  var refs = {};
+  for (var v = 0; v < items.length; v++) refs[items[v].number] = true;
   var res = api('post', '/api/integration/invoices', { invoices: items });
   var msg = 'Invoices: ' + res.created + ' new, ' + res.updated + ' updated';
   if (res.skipped.length) msg += ', skipped ' + res.skipped.join('; ');
   if (res.unmatchedOrders.length) msg += ', orders not in dashboard: ' + res.unmatchedOrders.join(', ');
-  return msg;
+  return { msg: msg, refs: refs, count: items.length };
+}
+
+/** Rows whose Type starts with REMOVE(D), SUPERSEDED, VOID or QUOTE are not real invoices. */
+function isDeadType(type) {
+  return /^\s*(REMOVE|SUPERSEDED|VOID|QUOTE)/i.test(String(type || ''));
+}
+
+/**
+ * Removes every dashboard invoice that is not a valid row on 8. Invoices. Never edits the sheet.
+ * Safety: does nothing if the sheet gave no valid rows, or if it would remove more than half of the dashboard's invoices.
+ */
+function removeStaleInvoices(exp, validRefs) {
+  var valid = 0;
+  for (var k in validRefs) if (validRefs.hasOwnProperty(k)) valid++;
+  if (!valid) return 'Remove step skipped: no valid rows read from ' + CONFIG.INVOICES_TAB;
+  var stale = [];
+  var seen = {};
+  for (var i = 0; i < exp.invoices.length; i++) {
+    var n = String(exp.invoices[i].number || '').trim();
+    if (!n || validRefs[n] || seen[n]) continue;
+    seen[n] = true;
+    stale.push(n);
+  }
+  if (!stale.length) return null;
+  if (stale.length > 3 && stale.length > exp.invoices.length / 2) {
+    return 'Remove step stopped: it would remove ' + stale.length + ' of ' + exp.invoices.length + ' invoices. Check ' + CONFIG.INVOICES_TAB + '.';
+  }
+  var res = api('post', '/api/integration/invoices', { invoices: [], remove: stale });
+  var msg = [];
+  if (res.removed && res.removed.length) msg.push('Removed from dashboard (not on ' + CONFIG.INVOICES_TAB + '): ' + res.removed.join(', '));
+  if (res.keptWithPop && res.keptWithPop.length) msg.push('NOT removed because a proof of payment is attached (remove by hand if sure): ' + res.keptWithPop.join(', '));
+  return msg.join(' | ') || null;
 }
 
 function driveIndex() {

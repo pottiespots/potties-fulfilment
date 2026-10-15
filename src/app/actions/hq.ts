@@ -12,6 +12,7 @@ import { dayTime, fromLocalInput } from '@/lib/format';
 import { notifyFoundry, sendEmail } from '@/lib/notify';
 import { checkUpload, putFile, storageKey } from '@/lib/storage';
 import { syncRecentOrders, shopifyConfigured, addressFromShopify, checkTrackingEmail } from '@/lib/shopify';
+import { removeInvoices } from '@/lib/invoices';
 import type { Res } from './orders';
 
 async function requireHQ(): Promise<User> {
@@ -201,6 +202,15 @@ export async function createInvoice(_p: Res, fd: FormData): Promise<Res> {
   if (orderId) await logEvent({ orderId, userId: u.id, actor: actorLabel(u), text: `${supplier === 'FOUNDRY' ? 'Foundry' : 'LL'} invoice ${number} received`, internal: supplier !== 'FOUNDRY' });
   if (supplier === 'FOUNDRY') await notifyFoundry(`Invoice ${number} received`, `Potties has received your invoice ${number} (${money(amountCents)}). Payment due ${dayTime(dueAt)}.`, orderId ? `/f/orders/${orderId}` : '/f/invoices');
   return done(`Invoice ${number} added`);
+}
+
+/** Deletes an invoice that should not be there (duplicate, voided, or removed from the COGS sheet). */
+export async function removeInvoice(invoiceId: string): Promise<Res> {
+  const u = await requireHQ();
+  const [inv] = await db.select().from(schema.supplierInvoices).where(eq(schema.supplierInvoices.id, invoiceId));
+  if (!inv) return { error: 'That invoice was already removed.' };
+  await removeInvoices([inv.number], actorLabel(u), { force: true, reason: 'removed by HQ' });
+  return done(`${inv.number} removed`);
 }
 
 export async function markInvoicePaid(invoiceId: string): Promise<Res> {

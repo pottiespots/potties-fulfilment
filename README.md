@@ -109,7 +109,8 @@ Every hour the script:
 2. Writes a **15. Fulfilment** tab into the sheet, with each order's stage, ship-by date, courier and tracking number.
 3. Saves each order's Shopify packing slip as **Packing slip #order.pdf** into **Drive › Potties › Fulfilment › #order**, along with proof photos and proofs of payment. The PDF is also attached to the order on the dashboard (**Download PDF**).
 4. Saves Gmail attachments that mention an order number (waybills, artwork) into that folder and links them to the order.
-5. Logs the run (`POST /api/integration/report`). The result shows on the **Dashboard**, **Invoices** and **Logins → Check connections**.
+5. Removes any dashboard invoice that is no longer a valid row on **8. Invoices**, meaning its row was deleted or its Type starts with REMOVE, SUPERSEDED, VOID or QUOTE. The sheet is the single source of truth. To remove a duplicate, delete its row or type REMOVE in its Type cell. Invoices with a proof of payment attached are not removed automatically; the sync log lists them, and you can use **Remove** on the Invoices page. Note: an invoice attached by hand in the Order Desk is also removed at the next sync unless it's on the sheet.
+6. Logs the run (`POST /api/integration/report`). The result shows on the **Dashboard**, **Invoices** and **Logins → Check connections**.
 
 **Setup (once):**
 1. Go to script.google.com and click **New project**. Sign in with the Google account that owns the COGS sheet.
