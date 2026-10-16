@@ -519,3 +519,10 @@ ul.notes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:gr
 .cnote.warn{background:var(--warn-bg);color:var(--fg);border-left:4px solid var(--warn)}
 .cnote.bad{background:var(--bad-bg);color:var(--fg);border-left:4px solid var(--bad)}
 .btn.danger{color:var(--bad)} .btn.danger:hover{border-color:var(--bad);background:var(--bad-bg)}
+.done-orders{margin-top:14px}
+.done-orders>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.done-orders>summary::-webkit-details-marker{display:none}
+.done-orders>summary .num{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:12px;letter-spacing:0;color:var(--fg)}
+.done-orders>summary .chev{display:inline-block;transition:transform .15s}
+.done-orders[open]>summary .chev{transform:rotate(90deg)}
+.done-orders[open]>summary{margin-bottom:10px}

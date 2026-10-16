@@ -193,6 +193,8 @@ export function FilterBox({ target, placeholder }: { target: string; placeholder
       onChange={(e) => {
         const q = e.target.value.toLowerCase();
         document.querySelectorAll<HTMLElement>(`${target} [data-search]`).forEach((el) => { el.hidden = !!q && !el.dataset.search!.toLowerCase().includes(q); });
+        // Open collapsed sections (e.g. Delivered orders) while searching so matches inside them show.
+        if (q) document.querySelectorAll<HTMLDetailsElement>(`${target} details[data-search-open]`).forEach((d) => { d.open = true; });
       }} />
   );
 }

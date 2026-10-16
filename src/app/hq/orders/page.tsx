@@ -86,34 +86,56 @@ export default async function Orders({ searchParams }: { searchParams: Promise<R
         <LinkSelect label="Sort by" value={`${sort}:${dir}`} options={sortOptions} />
         <FilterBox target="#orders" placeholder="Search order #, customer, town" />
       </div>
-      {view === 'list' ? (
-        <div className="tbl-wrap">
-          <table className="otbl">
-            <thead><tr>
-              <Th k="order">Order</Th><Th k="town">Ship to</Th><Th k="shipBy">Ship by</Th><Th k="stage">Stage</Th>
-              <Th k="custom">Custom</Th><Th k="proof">Proof</Th><Th k="tracking">Tracking</Th><Th k="invoice">Invoice</Th>
-            </tr></thead>
-            <tbody>
-              {rows.map((o) => {
-                const late = urgency(o.stage, o.shipBy, now) === 'late';
-                return (
-                  <tr key={o.id} className={late ? 'r-late' : ''} data-search={`${o.name} ${o.customerName} ${o.city} ${itemsSummary(o)}`}>
-                    <td><Link className="lnk" href={`/hq/orders/${o.id}`}>{o.name}</Link><br /><span className="sub2">{o.customerName}</span></td>
-                    <td>{o.city}<br /><span className="sub2">{o.province}</span></td>
-                    <td className="num">{day(o.shipBy)}<br /><LeftPill o={o} now={now} /></td>
-                    <td>{STAGE_LABEL[o.stage]}{o.openQuestion && <> <Pill tone="bad">Question</Pill></>}
-                      <div className="prog">{STAGES.map((s, j) => <i key={s} className={j < stageIndex(o.stage) ? 'd' : j === stageIndex(o.stage) ? 'c' : ''} />)}</div></td>
-                    <td>{customPill(o)}</td><td>{proofPill(o)}</td>
-                    <td>{o.trackingNumber ? <><TrackingLink number={o.trackingNumber} url={trackingUrl(o.trackingCompany, o.trackingNumber)} />{(o.stage === 'SHIPPED' || o.stage === 'DELIVERED') && <><br /><NoticePill o={o} /></>}</> : o.stage === 'PACKED' ? <Pill tone="warn">Waiting</Pill> : <span className="sub2">—</span>}</td>
-                    <td>{invPill(o)}</td>
-                  </tr>
-                );
-              })}
-              {!rows.length && <tr><td colSpan={8} className="sub2">No orders match these filters.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      ) : (
+      {view === 'list' ? (() => {
+        const row = (o: OrderRow) => {
+          const late = urgency(o.stage, o.shipBy, now) === 'late';
+          return (
+            <tr key={o.id} className={late ? 'r-late' : ''} data-search={`${o.name} ${o.customerName} ${o.city} ${itemsSummary(o)}`}>
+              <td><Link className="lnk" href={`/hq/orders/${o.id}`}>{o.name}</Link><br /><span className="sub2">{o.customerName}</span></td>
+              <td>{o.city}<br /><span className="sub2">{o.province}</span></td>
+              <td className="num">{day(o.shipBy)}<br /><LeftPill o={o} now={now} /></td>
+              <td>{STAGE_LABEL[o.stage]}{o.openQuestion && <> <Pill tone="bad">Question</Pill></>}
+                <div className="prog">{STAGES.map((s, j) => <i key={s} className={j < stageIndex(o.stage) ? 'd' : j === stageIndex(o.stage) ? 'c' : ''} />)}</div></td>
+              <td>{customPill(o)}</td><td>{proofPill(o)}</td>
+              <td>{o.trackingNumber ? <><TrackingLink number={o.trackingNumber} url={trackingUrl(o.trackingCompany, o.trackingNumber)} />{(o.stage === 'SHIPPED' || o.stage === 'DELIVERED') && <><br /><NoticePill o={o} /></>}</> : o.stage === 'PACKED' ? <Pill tone="warn">Waiting</Pill> : <span className="sub2">—</span>}</td>
+              <td>{invPill(o)}</td>
+            </tr>
+          );
+        };
+        const head = (
+          <thead><tr>
+            <Th k="order">Order</Th><Th k="town">Ship to</Th><Th k="shipBy">Ship by</Th><Th k="stage">Stage</Th>
+            <Th k="custom">Custom</Th><Th k="proof">Proof</Th><Th k="tracking">Tracking</Th><Th k="invoice">Invoice</Th>
+          </tr></thead>
+        );
+        // Finished orders sit in a closed dropdown so the table shows only work in progress
+        // (unless the Delivered / Cancelled stage was picked on purpose).
+        const finished = (o: OrderRow) => !stage && (o.stage === 'DELIVERED' || o.stage === 'CANCELLED');
+        const active = rows.filter((o) => !finished(o));
+        const delivered = rows.filter((o) => finished(o) && o.stage === 'DELIVERED');
+        const cancelled = rows.filter((o) => finished(o) && o.stage === 'CANCELLED');
+        const drop = (title: string, list: OrderRow[]) => list.length > 0 && (
+          <details className="done-orders" data-search-open>
+            <summary><span className="chev" aria-hidden>▸</span> {title} <span className="num">{list.length}</span></summary>
+            <div className="tbl-wrap"><table className="otbl">{head}<tbody>{list.map(row)}</tbody></table></div>
+          </details>
+        );
+        return (
+          <>
+            <div className="tbl-wrap">
+              <table className="otbl">
+                {head}
+                <tbody>
+                  {active.map(row)}
+                  {!active.length && <tr><td colSpan={8} className="sub2">{rows.length ? 'No orders in progress. Finished orders are below.' : 'No orders match these filters.'}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            {drop('Delivered', delivered)}
+            {drop('Cancelled', cancelled)}
+          </>
+        );
+      })() : (
         <div className="board-scroll">
           <div className="board">
             {STAGES.map((s) => {
